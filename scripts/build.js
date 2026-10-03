@@ -1,9 +1,7 @@
 import { build } from 'esbuild';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
-import { schema } from '../src/schema.js';
 
 await build({ entryPoints: ['src/action.js'], outfile: 'dist/action.cjs', bundle: true, platform: 'node', target: 'node24', format: 'cjs', minify: false, legalComments: 'eof' });
-await writeFile('schema.json', JSON.stringify(schema, null, 2) + '\n');
 
 const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
 const notices = ['Third-party notices for the Buildgraph Action bundle.\n'];

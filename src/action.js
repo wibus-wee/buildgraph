@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { pack, unpack } from './artifacts.js';
-import { plan, readManifest } from './graph.js';
+import { dependencies, plan, readWorkflow } from './graph.js';
 
 const input = name => core.getInput(name);
 const required = name => core.getInput(name, { required: true });
@@ -13,16 +13,13 @@ async function main() {
   const key = input('key');
   if (key) core.setSecret(key);
   if (operation === 'plan') {
-    const manifest = await readManifest(required('manifest'));
-    const result = plan(manifest, { target: input('target') || manifest.defaultTarget, refs: JSON.parse(input('refs') || '{}') });
-    if (input('expected-digest') && result.digest !== input('expected-digest')) throw new Error('Manifest changed after workflow generation. Recompile and commit the workflow before dispatching.');
+    const workflow = await readWorkflow(required('workflow'));
+    const result = plan(workflow, { target: input('target') || undefined, plannerJob: input('planner-job') || 'plan' });
     core.setOutput('selected', JSON.stringify(result.selected));
-    core.setOutput('refs', JSON.stringify(result.refs));
-    core.setOutput('digest', result.digest);
-    const rows = result.selected.map(id => [id, (manifest.nodes[id].needs ?? []).join(', ') || '—', manifest.nodes[id].output ? (manifest.nodes[id].output.visibility ?? 'encrypted') : 'none']);
+    const rows = result.selected.map(id => [id, dependencies(workflow, id).join(', ') || '—']);
     await core.summary.addHeading('Buildgraph plan').addTable([
-      [{ data: 'Node', header: true }, { data: 'Needs', header: true }, { data: 'Output', header: true }], ...rows,
-    ]).addRaw(`\nManifest SHA-256: \`${result.digest}\`\n`).write();
+      [{ data: 'Job', header: true }, { data: 'Needs', header: true }], ...rows,
+    ]).write();
     core.info(`Selected: ${result.selected.join(' -> ')}`);
   } else if (operation === 'prepare') {
     await mkdir(required('directory'), { recursive: true });

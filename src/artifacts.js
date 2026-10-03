@@ -11,7 +11,7 @@ const headerSize = 32; // BG01, 12-byte nonce, 16-byte GCM authentication tag.
 
 function decodeKey(key, context) {
   if (!/^[a-fA-F0-9]{64}$/.test(key ?? '')) throw new Error('Encrypted artifacts require a 64-character hex key in BUILDGRAPH_ARTIFACT_KEY (or the configured secret)');
-  if (typeof context !== 'string' || !context) throw new Error('Encrypted artifacts require a nonempty context identifying the run, manifest, and producer');
+  if (typeof context !== 'string' || !context) throw new Error('Encrypted artifacts require a nonempty context identifying the run, workflow revision, and producer');
   return Buffer.from(key, 'hex');
 }
 

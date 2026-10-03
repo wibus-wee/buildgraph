@@ -22,8 +22,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npm run check
-      - name: Verify committed bundle and schema
-        run: git diff --exit-code -- dist schema.json
+      - name: Verify committed Action bundle
+        run: git diff --exit-code -- dist
   workflow-lint:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +38,5 @@ jobs:
           go-version: '1.26'
           cache: false
       - run: npm ci --ignore-scripts
-      - run: node bin/buildgraph.js compile examples/private-projects.json --output .github/workflows/private-example.yml
       - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-      - run: actionlint -shellcheck=''
+      - run: actionlint -shellcheck='' .github/workflows/*.yml examples/private-projects.yml

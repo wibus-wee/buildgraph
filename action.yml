@@ -8,23 +8,19 @@ inputs:
   operation:
     description: plan, prepare, pack, or unpack
     required: true
-  manifest:
-    description: Path to the graph manifest for plan
+  workflow:
+    description: Path to the native GitHub Actions workflow YAML for plan
   target:
     description: Comma-separated target node IDs
-  refs:
-    description: JSON object of source ref overrides
-    default: '{}'
-  expected-digest:
-    description: SHA-256 of the manifest used by the compiler
+  planner-job:
+    description: Planner job ID to exclude from selectable targets; it must have no dependencies
+    default: plan
   directory:
     description: Output directory to package, prepare, or restore
   inputs-directory:
     description: Dependency input root for prepare
   source-directory:
     description: Checked-out source directory for commit provenance
-  node:
-    description: Node ID for prepare
   archive:
     description: Downloaded archive path for unpack
   visibility:
@@ -33,14 +29,10 @@ inputs:
   key:
     description: 64-character hex encryption key; pass from a repository or environment secret
   context:
-    description: Authenticated run, manifest, and producer identity for encrypted artifacts
+    description: Authenticated run, workflow revision, and producer identity for encrypted artifacts
 outputs:
   selected:
     description: JSON array of selected nodes including prerequisites
-  refs:
-    description: JSON object of source refs for selected nodes
-  digest:
-    description: Manifest SHA-256
   archive:
     description: Absolute path of the packaged output
 runs:

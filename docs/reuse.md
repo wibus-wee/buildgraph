@@ -1,68 +1,76 @@
-# 在其他构建中心复用
+# 复用 Action 和 JS 库
 
 | 方式 | 适用情况 |
 | --- | --- |
-| Fork 本仓库 | 直接把此仓库变成自己的公开 build hub，默认使用 `./hub` Action |
-| 安装 JS 库和 CLI | 已有公开 build repo，需要生成其中的 workflow |
-| `uses: wibus-wee/buildgraph@<SHA>` | 执行 planner 或 pack/unpack；生成的工作流会自动插入这些调用 |
+| Fork 本仓库 | 直接编辑现成工作流，把它作为公开构建中心 |
+| `uses: wibus-wee/buildgraph@<SHA>` | 在已有原生 YAML 中使用目标选择和产物封装 |
+| CLI / JS 库 | 本地查看依赖闭包，或在其他工具中读取工作流 |
 
-## 生成远程 Action 工作流
+## 在现有 workflow 中 uses
 
-项目尚未发布到 npm registry，可按 commit 从 GitHub 安装。在你的中央 build repo 根目录执行，替换 `<SHA>` 为已审核的 40 位 commit SHA：
+把 `<SHA>` 替换为已审核的 40 位 commit SHA。这些 steps 在你的工作流中运行，读取你的 YAML 和你的 secrets：
+
+```yaml
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      selected: ${{ steps.graph.outputs.selected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: wibus-wee/buildgraph@<SHA>
+        id: graph
+        with:
+          operation: plan
+          workflow: .github/workflows/build.yml
+          target: ${{ inputs.target }}
+  app:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'app') }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Replace with your checkout and build steps'
+```
+
+只需在顶部声明正常的 `on.workflow_dispatch.inputs.target`。添加项目时编辑 jobs，添加依赖时编辑 needs。无须安装 npm 包或运行生成命令。
+
+pack/unpack 也用同一个 Action，以 `operation` 区分。完整的 artifact 上传、下载和权限配置参考[工作流接入](./configuration.md#action-inputs)与[实际工作流](../.github/workflows/build.yml)。如果只需按原生 needs 运行全图，可以省略 planner，单独使用产物操作。
+
+## 本地 CLI
+
+项目尚未发布到 npm registry，可以按 commit 从 GitHub 安装：
 
 ```sh
 npm install --save-dev github:wibus-wee/buildgraph#<SHA>
-npx buildgraph compile buildgraph.json \
-  --action-ref wibus-wee/buildgraph@<SHA> \
-  --output .github/workflows/build.yml
+npx buildgraph validate .github/workflows/build.yml
+npx buildgraph plan .github/workflows/build.yml --target app
 ```
 
-提交配置、lockfile 和生成的工作流。生成物会 checkout 你的中央 repo 到 `hub/`，从远程 commit 加载 Buildgraph Action；source、secrets、variables 和 Releases 都属于你的中央 repo。构建仍在你的公开 repo 中运行，不会调用本项目仓库的 workflow。
-
-更新 library 和 Action 时使用同一个 SHA，再重新生成 YAML。远程模式不需要把本项目源码或 bundle 复制进你的 repo；`check` 必须使用与 `compile` 相同的 `--action-ref`。
+CLI 读取标准 YAML，不改写工作流。`keygen` 仅用于首次配置或明确的密钥轮换。
 
 ## JS API
 
 ```js
-import { readManifest, plan, compile } from '@wibus-wee/buildgraph';
+import { readWorkflow, plan } from '@wibus-wee/buildgraph';
 
-const graph = await readManifest('buildgraph.json');
-const execution = plan(graph, { target: 'app', refs: { core: '<commit-sha>' } });
+const workflow = await readWorkflow('.github/workflows/build.yml');
+const execution = plan(workflow, { target: 'app' });
 console.log(execution.selected);
-
-const yaml = compile(graph, {
-  manifestPath: 'buildgraph.json',
-  actionRef: 'wibus-wee/buildgraph@<40-character-commit-sha>',
-});
 ```
 
 | 导出 | 契约 |
 | --- | --- |
-| `validate(manifest)` | 校验结构及完整图，成功返回原对象；不修改输入，失败抛 Error |
-| `readManifest(file)` | 异步读取 JSON 并校验 |
-| `plan(manifest, options?)` | 返回 `{targets, selected, refs, digest}`；selected 为去重的拓扑序，只包含目标闭包 |
-| `order(manifest)` | 校验后返回全图拓扑序 |
-| `digest(manifest)` | 对 JSON 序列化结果计算 SHA-256；本身不做校验 |
-| `compile(manifest, options?)` | 返回 YAML 字符串，不写文件；选项见上例 |
-| `pack(options)` | 异步打包，返回临时 archive 绝对路径；上传完成后调用者可清理其父目录 |
-| `unpack(options)` | 异步认证并恢复到尚不存在的目录，返回最终目录路径；失败抛错并清理临时内容 |
+| `readWorkflow(file)` | 异步读取 `.yml` / `.yaml` 并校验 job 依赖 |
+| `parseWorkflow(source)` | 解析 YAML 1.2 文本并校验；拒绝重复键，限制 alias 展开 |
+| `validate(workflow)` | 只校验 job IDs、needs 及环；返回原对象，不修改输入 |
+| `dependencies(workflow, id)` | 返回某个 job 的直接 needs 数组，支持原生 string / array 写法 |
+| `plan(workflow, options?)` | 返回 `{targets, selected}`；selected 为去重的拓扑序，不包含 planner |
+| `order(workflow)` | 返回全图拓扑序，包含 planner |
+| `pack(options)` | 异步打包并返回临时 archive 路径，上传后调用方可清理父目录 |
+| `unpack(options)` | 异步验证并恢复到尚不存在的目录，返回目标路径；失败清理临时内容 |
 
-pack/unpack 选项为 `directory`、`visibility`（默认 encrypted）、`key`、`context` 和可选 `tempRoot`；unpack 额外需要 `archive`。key 为 64 位 hex 字符串，context 标识这份产物的 run、配置和生产者。公共模式不需要 key。具体格式及安全边界由[产物协议](./architecture.md#产物协议)定义。
+plan 的 options 为 `target` 和 `plannerJob`。target 缺省时读取工作流的 dispatch target 默认值；plannerJob 默认 `plan`。plan 不评估 GitHub 表达式、job if 或矩阵，不执行构建命令。错误均通过 Error 抛出。
 
-## 直接使用 planner Action
-
-```yaml
-steps:
-  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-    with:
-      persist-credentials: false
-  - uses: wibus-wee/buildgraph@<40-character-commit-sha>
-    id: graph
-    with:
-      operation: plan
-      manifest: buildgraph.json
-      target: app
-      refs: '{}'
-```
-
-planner 的 `selected` 和 `refs` outputs 是 JSON 字符串，`digest` 是配置 SHA-256。此 Action 仅计算执行计划；要获得实际 job DAG，使用编译器生成 workflow。其余 operation inputs 见 [action.yml](../action.yml)，通常由编译器填写。
+pack/unpack 的 options 为 `directory`、`visibility`（默认 encrypted）、`key`、`context` 和可选 `tempRoot`；unpack 还需 `archive`。key 为 64 字符 hex，context 用于绑定生产者身份；public 模式不需要 key。协议由[架构说明](./architecture.md#产物协议)定义。
