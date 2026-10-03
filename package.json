@@ -1,0 +1,26 @@
+{
+  "name": "@wibus-wee/buildgraph",
+  "version": "0.1.0",
+  "description": "Compile a multi-repository build graph into native GitHub Actions jobs.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "bin": { "buildgraph": "bin/buildgraph.js" },
+  "exports": { ".": "./src/index.js", "./schema": "./schema.json" },
+  "files": ["bin", "src", "dist", "action.yml", "schema.json", "README.md", "docs", "LICENSE"],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "generate": "node bin/buildgraph.js compile buildgraph.json --output .github/workflows/build.yml",
+    "check:generated": "node bin/buildgraph.js check buildgraph.json --output .github/workflows/build.yml",
+    "test": "node --test",
+    "check": "npm test && npm run check:generated"
+  },
+  "repository": { "type": "git", "url": "https://github.com/wibus-wee/buildgraph.git" },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "ajv": "8.20.0",
+    "tar": "7.5.22",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": { "esbuild": "0.28.2" }
+}
