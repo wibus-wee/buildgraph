@@ -2,6 +2,8 @@
 
 公开 build repo 内的原生 workflow YAML 同时是 GitHub 的执行定义和 Buildgraph 的依赖图输入。GitHub 负责调度，Buildgraph 只辅助目标选择和产物封装。
 
+中央 repo 可以容纳许多互不相关的项目。依赖图允许多个不相连的分量；每个项目有自己的源码 ref、工具链、产物和发布版本。独立项目只有对 planner 的控制依赖，没有相互的构建依赖。只有消费上游结果的项目才连接 `needs` 并传递 artifact；不存在默认的全局 bundle 或统一版本。
+
 | 模块 | 入口 | 责任 |
 | --- | --- | --- |
 | 构建定义 | [build.yml](../.github/workflows/build.yml) | `workflow_dispatch`、jobs、needs、steps、凭证及发布 |

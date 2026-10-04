@@ -1,0 +1,100 @@
+name: Independent projects
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: site, backup, or site,backup
+        type: string
+        required: true
+        default: site
+      site_ref:
+        description: Site branch, tag, or commit SHA
+        type: string
+        default: main
+      backup_ref:
+        description: Backup tool branch, tag, or commit SHA
+        type: string
+        default: main
+
+permissions:
+  contents: read
+env:
+  CI: 'true'
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      selected: ${{ steps.graph.outputs.selected }}
+    steps:
+      - &checkout_hub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: ./hub/plan
+        id: graph
+        with:
+          workflow: hub/.github/workflows/independent-projects.yml
+          target: ${{ inputs.target }}
+
+  site:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'site') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - *checkout_hub
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: your-org/private-site
+          ref: ${{ inputs.site_ref }}
+          token: ${{ secrets.SOURCE_READ_TOKEN }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: |
+          npm ci
+          npm run build
+      - uses: ./hub/upload
+        with:
+          path: source/dist
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+
+  backup:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'backup') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - *checkout_hub
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: your-org/private-backup
+          ref: ${{ inputs.backup_ref }}
+          token: ${{ secrets.SOURCE_READ_TOKEN }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: source/go.mod
+          cache: false
+      - run: |
+          mkdir -p dist
+          go build -o dist/backup ./cmd/backup
+      - uses: ./hub/upload
+        with:
+          path: source/dist
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}

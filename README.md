@@ -1,100 +1,96 @@
 # Buildgraph
 
-一个公开的 GitHub Actions 构建中心，连接多个私有源码仓库。直接用原生 Actions YAML 的 `jobs`、`needs` 和 `steps` 描述构建拓扑，`workflow_dispatch` 选择目标后执行它及其上游链路。
+**用一个公开 GitHub 仓库，构建和分发许多互不相关的私有项目。**
 
-| 入口 | 用途 |
-| --- | --- |
-| [.github/workflows/build.yml](./.github/workflows/build.yml) | 直接编辑的构建图：core → web / cli → bundle |
-| [私有项目工作流](./examples/private-projects.yml) | 私有源码 checkout、共享 env、产物传递、统一 Release |
-| [plan](./plan/action.yml) / [upload](./upload/action.yml) / [download](./download/action.yml) | 选择目标、一步上传、一步恢复；在已有 workflow 中直接 uses |
-| [工作流接入](./docs/configuration.md) | 原生 YAML 写法、选择目标、认证和 Action inputs |
-| [架构与边界](./docs/architecture.md) | 目标筛选、失败传播、产物协议和公开数据边界 |
-| [复用指南](./docs/reuse.md) | 在现有工作流中 uses 本项目，或调用 JS 库 / CLI |
+一个网站、一个备份工具、一个照片应用，可以没有任何产品关系，也可以用完全不同的语言和版本号。它们的源码各自闭源，只共用这个公开的构建中心：统一放 workflows、可复用的配置，以及各项目自己的产物。不需要给每个私有项目再开一个 distribution repo。
 
-```mermaid
-flowchart LR
-  P[workflow_dispatch / plan] --> C[core]
-  C --> W[web]
-  C --> L[cli]
-  W --> B[bundle]
-  L --> B
-```
+[![Buildgraph：私有源码经各 job checkout 进入中央公开仓库的构建链；Agent 修改同一份 YAML，经校验和审阅后触发运行。](./docs/diagrams/buildgraph.png)](./docs/diagrams/buildgraph.png)
 
-工作流 YAML 是构建定义的唯一来源。GitHub 执行 jobs，Buildgraph 的 planner 读取同一个 YAML 中的 `needs`，计算所选目标的上游集合。构建命令、runner、矩阵、权限、secrets、env 和发布步骤都按标准 Actions 写法维护。修改 YAML 后提交即可运行。
+[打开大图](./docs/diagrams/buildgraph.png) · [下载可编辑的 Excalidraw 源文件](./docs/diagrams/buildgraph.excalidraw)
 
-## 运行
+图中蓝色大边界是**你的公开 build repo**，左侧文件夹是私有源码仓库。网站、备份工具、照片应用分开构建，也分开出产物；它们之间没有依赖箭头。只有照片应用确实依赖 sdk，所以那两个节点之间才有 `needs` 和带锁的产物传递。
 
-本仓库的演示已配置产物密钥，直接在 Actions → **Buildgraph demo** → **Run workflow** 中选择目标，或使用 GitHub CLI：
+上方选择 `target=site`，本次只构建网站，其他项目跳过。选择 `site,backup` 可以在一次运行中构建两个独立项目；它们不会因此被合并成一个产品。`plan` 读取同一份 YAML，只有发现真实的 `needs` 依赖时才补上必要的上游，GitHub 本身负责调度和失败传播。
+
+图展示接入私有项目后的结构，产物出口按项目区分；使用 artifact 还是公开 Release，由各自的 workflow 决定。仓库自带的 demo 使用本地示例代码，包含一个独立目标和一条有依赖的链路，不需要你的真实源码，也不会创建 Release。
+
+## 先跑通一次
+
+在 GitHub 上 **Fork 本仓库**，例如命名为 `build-hub`，然后 clone 你的 fork。在 fork 的 Actions 页面启用 workflows。
 
 ```sh
-gh workflow run build.yml -f target=bundle
-gh workflow run build.yml -f target=cli
-gh workflow run build.yml -f target=web,cli -F plan_only=true
+git clone "https://github.com/YOUR_ACCOUNT/build-hub.git"
+cd build-hub
+gh repo set-default YOUR_ACCOUNT/build-hub
 ```
 
-`bundle` 运行 `core → [web, cli] → bundle`；`cli` 只运行 `core → cli`；`independent` 是独立目标。共享依赖只构建一次，分支可以并行。`plan_only=true` 只显示计划。
+上述命令需要已登录的 GitHub CLI；`set-default` 将后续操作指向你的 fork。先运行不需要任何 secret 的独立演示：打开 **Actions → Buildgraph demo → Run workflow**，把 target 改成 `independent`，点击运行。也可以从当前目录触发：
 
-最终 bundle artifact 中的 `output.tar.gz` 包含 HTML 和可执行 Node CLI。中间产物以密文跨 job 传递，最终产物显式选择公开。
+```sh
+gh workflow run build.yml -f target=independent
+```
 
-Fork 成自己的构建中心时，需要首次创建 `BUILDGRAPH_ARTIFACT_KEY` secret。已有仓库不要随意替换密钥，否则无法恢复仍需使用的历史产物：
+成功后，运行页面只会执行 plan 和 independent，其他 jobs 都被跳过。下载名称含 `independent` 的 artifact，解压外层 ZIP，再展开 `output.tar.gz`，里面是 `independent.txt`。这就是“选一个独立项目，只构建它”的完整过程。
+
+只看计划、不执行构建时，在 demo 的表单勾选 `plan_only`。演示的其他目标用于验证依赖链，接入独立项目不需要使用它们。
+
+## 换成你的私有项目
+
+从 [independent-projects.yml](./examples/independent-projects.yml) 开始：一个 Node.js 网站 `site`，一个 Go 备份工具 `backup`。两个 job 都只依赖 planner，不依赖彼此，也不互相下载产物。
+
+```sh
+cp examples/independent-projects.yml .github/workflows/independent-projects.yml
+```
+
+把 `your-org/private-site`、`your-org/private-backup` 换成你的仓库，再修改各自的 runner、工具链、构建命令和输出目录。网站示例执行 `npm ci`、`npm run build`；备份工具执行 `go build`。项目可以拥有完全不同的构建方式。
+
+中央仓库放在 `hub/`，私有源码放在 `source/`。保留这两个 checkout 目录的分离，`uses: ./hub/plan`、`./hub/upload`、`./hub/download` 才能找到本地 Action。
+
+在中央仓库添加 `SOURCE_READ_TOKEN` secret，使用获准读取这些源码仓库的 fine-grained PAT，并授予所需仓库的 Contents: read 权限。也可换用 [GitHub App 安装令牌](./docs/configuration.md#私有源码与-ref)。源码仓库中的 secrets 不会自动传过来。
+
+这个模板默认加密每个项目的产物，所以还需要首次创建 `BUILDGRAPH_ARTIFACT_KEY`。已有密钥时继续使用，不要重新生成；Fork 不会复制原仓库的 secrets：
 
 ```sh
 openssl rand -hex 32 | gh secret set BUILDGRAPH_ARTIFACT_KEY
 ```
 
-## 编辑构建链
+公共配置写在 workflow 顶层 `env`，跨 workflow 的值放中央仓库 Settings → Secrets and variables → Actions 的 Variables 中，用 `${{ vars.NAME }}` 引用。密钥只通过 `${{ secrets.NAME }}` 传入。
 
-直接修改 [.github/workflows/build.yml](./.github/workflows/build.yml)。每个参与选择的 job 声明真实依赖，并使用 planner 的选择结果作为条件：
+提交并推送新 workflow 到默认分支后，在 **Actions → Independent projects** 选择 `target=site`。它只 checkout 和构建网站；`target=backup` 只构建备份工具，`target=site,backup` 则分别构建两者。`site_ref`、`backup_ref` 各自决定源码版本，需要固定版本时填写 commit SHA。
+
+只对允许公开的输出设置 `visibility: public`，并省略 upload 的 key。需要长期分发时，为对应项目添加发布 job，例如用 `site-v1.2.0`、`backup-v0.8.0` 区分同一仓库里的 Releases；这些版本互不绑定。独立项目模板本身不会创建 Release。
+
+## 以后新增项目，改哪里？
+
+**直接改 `.github/workflows/*.yml`。** 一个构建节点就是一个原生 job，依赖写在 `needs`，命令写在 `steps`。无需生成 workflow，也没有另一份构建清单需要同步。
+
+一个没有项目依赖的新 job，只依赖 planner：
 
 ```yaml
-app:
-  needs: [plan, core]
-  if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'app') }}
+desktop:
+  needs: plan
+  if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'desktop') }}
   runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        repository: your-org/private-app
-        ref: ${{ inputs.app_ref }}
-        token: ${{ secrets.SOURCE_READ_TOKEN }}
-        persist-credentials: false
-    - run: npm ci
-    - run: npm run build
 ```
 
-产物操作各用一个 step。下面使用已经 checkout 到 `hub/` 的本仓库；`upload` 的 `artifact-id` 经 job output 传给下游：
+这里的 `needs: plan` 只是在等目标选择结果，不代表依赖另一个产品。`if` 控制该 job 是否属于本次选择。复制 job 时，条件中的 `'desktop'` 必须与新 job 的 ID 一致。
 
-```yaml
-- uses: ./hub/download
-  with:
-    artifact-id: ${{ needs.core.outputs.artifact_id }}
-    path: inputs/core
-    key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-- run: npm run build
-- uses: ./hub/upload
-  id: upload
-  with:
-    path: dist
-    key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-```
+三个 Action 各自只做一件事：`plan` 选出目标及必要上游，`upload` 上传该项目的输出目录，`download` 在确实需要另一个 job 的产物时恢复它。独立项目通常只用 plan 和 upload。
 
-打包、加密、校验、恢复、临时目录清理都由 Action 完成。最终公开产物使用 `visibility: public`，省略 key。完整的 job outputs、checkout、构建和发布写法在[私有项目工作流](./examples/private-projects.yml)中。
+只有真实依赖才增加项目间的边。例如 app 需要 core 的构建结果，才写 `needs: [plan, core]`，再通过 artifact ID 显式 download；仅写 needs 不会自动传文件。[依赖项目示例](./examples/private-projects.yml)展示了 `core → app → publish`。选择 publish 会公开发布 app，需要先配置 production environment；不要把这个目标当作所有项目的统一终点。
 
-通用配置放顶层 `env` 或仓库 variables，通用步骤可以用 YAML anchors、composite actions 或 reusable workflows 复用。planner 会对标准选择条件中的错误 job ID、缺失的直接 planner 依赖报错；自定义条件仍由 GitHub 执行。
+目录、权限、源码 ref、共享变量和发布步骤仍由原生 Actions YAML 管理。所有 input 的精确定义见[工作流接入](./docs/configuration.md)；已有自己的 build repo 时，可以[直接引用这三个 Action](./docs/reuse.md)，不必 Fork。
 
-源码仓库不需要安装工作流。所有构建在中央公开 repo 执行，多个项目可以用不同 tag 前缀发布到同一个仓库的 Releases。
+项目多了，可以在同一个 build repo 里按项目或分组拆成多个 workflow。共享仓库不等于必须维护一张巨大的图：planner 只选择它所读取的那份 workflow 中的 jobs，`needs` 也只连接同一 workflow 内的节点。
 
-## 开发辅助库
+## 让 Agent 帮你维护
 
-只有修改 Buildgraph 本身的 JS 实现时才需要重新打包 Action；编辑工作流不需要构建工具：
+把 Agent 的工作目录设为**中央 build repo**，让它先读 [AGENTS.md](./AGENTS.md)。你提供项目仓库、依赖、源码 ref、构建命令、输出目录和是否允许公开发布，它就能修改同一份 YAML。图下方的路径是日常维护过程：改 workflow → 本地检查 → 审阅 diff → 提交并运行。
 
-```sh
-npm ci --ignore-scripts
-npm run build
-npm run check
-actionlint -shellcheck='' .github/workflows/*.yml examples/private-projects.yml
-```
+可以把下面这段任务交给 Agent，再换成你的实际信息：
 
-CI 在 Linux、macOS、Windows 上验证 planner 和产物传递，并检查提交的 Action bundle。第三方 Action 的固定版本直接写在相应 YAML 中。
+> 在这个 build repo 接入独立项目 `your-org/private-desktop`，job ID 为 `desktop`，不依赖现有项目。新增 dispatch 输入 `desktop_ref`，默认 main；使用现有 `SOURCE_READ_TOKEN` 和产物密钥。源码放 `source/`，执行 `npm ci && npm run build`，上传 `source/dist`，产物保持加密。先读 AGENTS.md 和实际 workflow。保持原生 jobs/needs/steps，不新建配置格式。验证选择 desktop 时只构建 desktop，现有目标不会带上它。报告修改文件、需要配置的 secret 名称和验证结果。本次不要触发公开发布。
 
-公开 repo 的工作流、元数据和日志仍可公开读取；加密 artifact 只保护其中的文件内容。真实项目接入前请确认[信任边界](./docs/architecture.md#公开数据与信任边界)。
+日常新增节点、修改依赖、修复构建失败的具体流程，放在 [Agent 维护指南](./docs/maintenance.md)。它区分了“改你的构建链”和“改 Buildgraph 工具实现”：前者通常只改 YAML，后者才需要重新打包 `dist/`。维护指南也说明了怎样更新这张 Excalidraw 图。
+
+公开仓库的 workflow、运行记录和日志仍然公开；加密 artifact 只保护其中的文件内容。不要把打印源码、打包整个 checkout 目录或输出 secret 的步骤交给构建链。进一步的运行与信任边界见[架构说明](./docs/architecture.md#公开数据与信任边界)。

@@ -39,4 +39,4 @@ jobs:
           cache: false
       - run: npm ci --ignore-scripts
       - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-      - run: actionlint -shellcheck='' .github/workflows/*.yml examples/private-projects.yml
+      - run: actionlint -shellcheck='' .github/workflows/*.yml examples/*.yml

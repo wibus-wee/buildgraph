@@ -28,7 +28,7 @@
   "scripts": {
     "build": "node scripts/build.js",
     "test": "node --test",
-    "check": "npm test && node bin/buildgraph.js validate && node bin/buildgraph.js validate examples/private-projects.yml"
+    "check": "npm test && node bin/buildgraph.js validate && node bin/buildgraph.js validate examples/private-projects.yml && node bin/buildgraph.js validate examples/independent-projects.yml"
   },
   "repository": {
     "type": "git",

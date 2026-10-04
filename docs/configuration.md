@@ -50,7 +50,9 @@ planner 读取静态 `needs`，不执行表达式或递归进入被调用的 reu
 
 ## 私有源码与 ref
 
-把 [private-projects.yml](../examples/private-projects.yml) 复制到 `.github/workflows/private-projects.yml`，替换 `repository` 和构建命令。在中央 repo 配置 `SOURCE_READ_TOKEN` secret，限定所需源码仓库的 Contents: read 权限。
+互不相关的项目从 [independent-projects.yml](../examples/independent-projects.yml) 开始，复制到 `.github/workflows/independent-projects.yml`，替换各自的 `repository` 和构建命令。site 与 backup 都只依赖 planner；目标填 site、backup 或 site,backup，分别选择一个或两个项目。它们的 refs、输出与版本互不绑定。
+
+确实存在源码构建依赖时，参考 [private-projects.yml](../examples/private-projects.yml)，复制到 `.github/workflows/private-projects.yml`。以下以这个 core→app 示例说明 refs。两种模板都在中央 repo 配置 `SOURCE_READ_TOKEN` secret，限定所需源码仓库的 Contents: read 权限。
 
 示例的 `core_ref` 和 `app_ref` 都是普通的 dispatch 字符串输入：
 
