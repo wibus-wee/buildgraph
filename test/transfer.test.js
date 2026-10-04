@@ -89,3 +89,27 @@ test('bad inputs fail before network calls and failed uploads clean their archiv
   await assert.rejects(upload({ ...f, client: { async uploadArtifact() { throw new Error('service failed'); } } }), /service failed/);
   assert.deepEqual(await readdir(f.tempRoot), ['source']);
 });
+
+test('remote download authenticates with producer metadata, not the receiving run', async t => {
+  const f = await fixture(t);
+  f.env.GITHUB_SHA = 'a'.repeat(40);
+  const { id, digest } = await upload(f);
+  const run = { id: 100, path: '.github/workflows/build.yml', head_branch: 'main', event: 'workflow_dispatch', head_sha: f.env.GITHUB_SHA, head_repository: { full_name: 'owner/hub' } };
+  const artifact = { ...f.stored[0], expired: false, workflow_run: { id: 100, head_sha: run.head_sha } };
+  const source = { repository: 'owner/hub', runId: 100, workflow: run.path, branch: 'main', token: 'test-token', api: async path => path.includes('/runs/') ? run : artifact };
+  const originalDownload = f.client.downloadArtifact;
+  f.client.listArtifacts = () => { throw new Error('must not list receiver artifacts'); };
+  f.client.downloadArtifact = (id, options) => { assert.equal(options.findBy.workflowRunId, 100); assert.equal(options.findBy.repositoryOwner, 'owner'); return originalDownload(id, options); };
+  const directory = join(f.tempRoot, 'remote-output');
+  const options = { ...f, artifactId: id, directory, source, expectedDigest: digest, env: { ...f.env, GITHUB_REPOSITORY: 'other/distribution', GITHUB_RUN_ID: '200', GITHUB_SHA: 'b'.repeat(40) } };
+  for (const change of [{ path: '.github/workflows/untrusted.yml' }, { head_branch: 'other' }, { event: 'pull_request' }, { head_repository: { full_name: 'fork/hub' } }]) {
+    await assert.rejects(download({ ...options, source: { ...source, api: async () => ({ ...run, ...change }) } }), /trusted repository/);
+  }
+  for (const change of [{ expired: true }, { workflow_run: { id: 999, head_sha: run.head_sha } }]) {
+    await assert.rejects(download({ ...options, source: { ...source, api: async path => path.includes('/runs/') ? run : { ...artifact, ...change } } }), /does not belong/);
+  }
+  await assert.rejects(download({ ...options, expectedDigest: '0'.repeat(64) }), /expected-digest/);
+  await assert.rejects(access(directory));
+  await download(options);
+  assert.equal(await readFile(join(directory, 'result.txt'), 'utf8'), 'private build result');
+});

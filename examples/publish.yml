@@ -1,0 +1,71 @@
+name: Publish photo
+run-name: Publish photo · ${{ inputs.request_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Buildgraph producer run ID
+        type: string
+        required: true
+      artifact_id:
+        description: Exact producer artifact ID
+        type: string
+        required: true
+      artifact_digest:
+        description: SHA-256 from the producer upload
+        type: string
+        required: true
+      request_id:
+        description: Correlation ID (not proof of authorization)
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: photo-publish
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: wibus-wee/buildgraph
+          ref: main # Pin an audited Buildgraph commit in production.
+          path: hub
+          persist-credentials: false
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        id: hub-token
+        with:
+          client-id: ${{ vars.BUILD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
+          owner: my
+          repositories: buildgraph
+          permission-actions: read
+      - uses: ./hub/download
+        with:
+          source-repository: my/buildgraph
+          source-workflow: .github/workflows/project-photo.yml
+          source-branch: main
+          source-run-id: ${{ inputs.source_run_id }}
+          artifact-id: ${{ inputs.artifact_id }}
+          expected-digest: ${{ inputs.artifact_digest }}
+          token: ${{ steps.hub-token.outputs.token }}
+          path: release-output
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+      - name: Publish to this distribution repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: photo-${{ inputs.source_run_id }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          tar -czf "$RUNNER_TEMP/photo.tar.gz" -C release-output .
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/photo.tar.gz" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" \
+            --notes "Build: https://github.com/my/buildgraph/actions/runs/$SOURCE_RUN_ID; request: $REQUEST_ID"

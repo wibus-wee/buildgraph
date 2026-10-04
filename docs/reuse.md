@@ -3,7 +3,7 @@
 | 方式 | 适用情况 |
 | --- | --- |
 | Fork 本仓库 | 直接编辑现成工作流，把它作为公开构建中心 |
-| `uses: wibus-wee/buildgraph/{plan,upload,download}@<SHA>` | 在已有原生 YAML 中选择对应 Action 入口 |
+| `uses: wibus-wee/buildgraph/{plan,upload,download,dispatch}@<SHA>` | 在已有原生 YAML 中选择对应 Action 入口 |
 | CLI / JS 库 | 本地查看依赖闭包，或在其他工具中读取工作流 |
 
 ## 在现有 workflow 中 uses
@@ -39,6 +39,8 @@ jobs:
 
 ## 本地 CLI
 
+`wibus-wee/buildgraph/dispatch@<SHA>` 接受 YAML inputs，可等待精确的远端 run；download 也支持显式来源的跨运行读取。完整配置及双向示例见[分发接入](./distribution.md)。
+
 项目尚未发布到 npm registry，可以按 commit 从 GitHub 安装：
 
 ```sh
@@ -70,6 +72,10 @@ console.log(execution.selected);
 | `diagnoseWiring(workflow, {plannerJob}?)` | 返回 `{level, job, message}[]`；检查标准选择条件，任意表达式不求值 |
 | `pack(options)` | 异步打包并返回临时 archive 路径，上传后调用方可清理父目录 |
 | `unpack(options)` | 异步验证并恢复到尚不存在的目录，返回目标路径；失败清理临时内容 |
+| `upload(options)` / `download(options)` | 与 Action 共用传输实现；需要传入官方 artifact client，参数见 [transfer.js](../src/transfer.js) |
+| `dispatch(options)` | 接收 repository、workflow、ref、token、YAML inputs；返回 runId 和 url |
+| `dispatchInputs(source)` | 校验原生 dispatch inputs 的 YAML mapping |
+| `waitForRun(options)` | 按 repository、runId、token 等待完成，返回 conclusion；超时抛错且不取消远端 |
 
 plan 的 options 为 `target` 和 `plannerJob`。target 缺省时读取工作流的 dispatch target 默认值；plannerJob 默认 `plan`。plan 不评估 GitHub 表达式、job if 或矩阵，不执行构建命令。错误均通过 Error 抛出。
 

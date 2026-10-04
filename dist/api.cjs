@@ -2060,7 +2060,7 @@ var require_dispatcher = __commonJS({
       }
       compose(...args) {
         const interceptors = Array.isArray(args[0]) ? args[0] : args;
-        let dispatch = this.dispatch.bind(this);
+        let dispatch2 = this.dispatch.bind(this);
         for (const interceptor of interceptors) {
           if (interceptor == null) {
             continue;
@@ -2068,21 +2068,21 @@ var require_dispatcher = __commonJS({
           if (typeof interceptor !== "function") {
             throw new TypeError(`invalid interceptor, expected function received ${typeof interceptor}`);
           }
-          dispatch = interceptor(dispatch);
-          if (dispatch == null || typeof dispatch !== "function" || dispatch.length !== 2) {
+          dispatch2 = interceptor(dispatch2);
+          if (dispatch2 == null || typeof dispatch2 !== "function" || dispatch2.length !== 2) {
             throw new TypeError("invalid interceptor");
           }
         }
-        return new ComposedDispatcher(this, dispatch);
+        return new ComposedDispatcher(this, dispatch2);
       }
     };
     var ComposedDispatcher = class extends Dispatcher {
       #dispatcher = null;
       #dispatch = null;
-      constructor(dispatcher, dispatch) {
+      constructor(dispatcher, dispatch2) {
         super();
         this.#dispatcher = dispatcher;
-        this.#dispatch = dispatch;
+        this.#dispatch = dispatch2;
       }
       dispatch(...args) {
         this.#dispatch(...args);
@@ -2232,12 +2232,12 @@ var require_dispatcher_base = __commonJS({
           this[kInterceptedDispatch] = this[kDispatch];
           return this[kDispatch](opts, handler2);
         }
-        let dispatch = this[kDispatch].bind(this);
+        let dispatch2 = this[kDispatch].bind(this);
         for (let i = this[kInterceptors].length - 1; i >= 0; i--) {
-          dispatch = this[kInterceptors][i](dispatch);
+          dispatch2 = this[kInterceptors][i](dispatch2);
         }
-        this[kInterceptedDispatch] = dispatch;
-        return dispatch(opts, handler2);
+        this[kInterceptedDispatch] = dispatch2;
+        return dispatch2(opts, handler2);
       }
       dispatch(opts, handler2) {
         if (!handler2 || typeof handler2 !== "object") {
@@ -7451,12 +7451,12 @@ var require_redirect_handler = __commonJS({
       }
     };
     var RedirectHandler = class {
-      constructor(dispatch, maxRedirections, opts, handler2) {
+      constructor(dispatch2, maxRedirections, opts, handler2) {
         if (maxRedirections != null && (!Number.isInteger(maxRedirections) || maxRedirections < 0)) {
           throw new InvalidArgumentError("maxRedirections must be a positive number");
         }
         util3.validateHandler(handler2, opts.method, opts.upgrade);
-        this.dispatch = dispatch;
+        this.dispatch = dispatch2;
         this.location = null;
         this.abort = null;
         this.opts = { ...opts, maxRedirections: 0 };
@@ -7593,15 +7593,15 @@ var require_redirect_interceptor = __commonJS({
     "use strict";
     var RedirectHandler = require_redirect_handler();
     function createRedirectInterceptor({ maxRedirections: defaultMaxRedirections }) {
-      return (dispatch) => {
+      return (dispatch2) => {
         return function Intercept(opts, handler2) {
           const { maxRedirections = defaultMaxRedirections } = opts;
           if (!maxRedirections) {
-            return dispatch(opts, handler2);
+            return dispatch2(opts, handler2);
           }
-          const redirectHandler = new RedirectHandler(dispatch, maxRedirections, opts, handler2);
+          const redirectHandler = new RedirectHandler(dispatch2, maxRedirections, opts, handler2);
           opts = { ...opts, maxRedirections: 0 };
-          return dispatch(opts, redirectHandler);
+          return dispatch2(opts, redirectHandler);
         };
       };
     }
@@ -10783,11 +10783,11 @@ var require_mock_utils = __commonJS({
       return newMockDispatch;
     }
     function deleteMockDispatch(mockDispatches, key) {
-      const index = mockDispatches.findIndex((dispatch) => {
-        if (!dispatch.consumed) {
+      const index = mockDispatches.findIndex((dispatch2) => {
+        if (!dispatch2.consumed) {
           return false;
         }
-        return matchKey(dispatch, key);
+        return matchKey(dispatch2, key);
       });
       if (index !== -1) {
         mockDispatches.splice(index, 1);
@@ -10877,7 +10877,7 @@ var require_mock_utils = __commonJS({
       const agent = this[kMockAgent];
       const origin = this[kOrigin];
       const originalDispatch = this[kOriginalDispatch];
-      return function dispatch(opts, handler2) {
+      return function dispatch2(opts, handler2) {
         if (agent.isMockActive) {
           try {
             mockDispatch.call(this, opts, handler2);
@@ -11387,7 +11387,7 @@ var require_mock_agent = __commonJS({
       }
       pendingInterceptors() {
         const mockAgentClients = this[kClients];
-        return Array.from(mockAgentClients.entries()).flatMap(([origin, scope]) => scope[kDispatches].map((dispatch) => ({ ...dispatch, origin }))).filter(({ pending }) => pending);
+        return Array.from(mockAgentClients.entries()).flatMap(([origin, scope]) => scope[kDispatches].map((dispatch2) => ({ ...dispatch2, origin }))).filter(({ pending }) => pending);
       }
       assertNoPendingInterceptors({ pendingInterceptorsFormatter = new PendingInterceptorsFormatter() } = {}) {
         const pending = this.pendingInterceptors();
@@ -11484,19 +11484,19 @@ var require_redirect = __commonJS({
     var RedirectHandler = require_redirect_handler();
     module2.exports = (opts) => {
       const globalMaxRedirections = opts?.maxRedirections;
-      return (dispatch) => {
+      return (dispatch2) => {
         return function redirectInterceptor(opts2, handler2) {
           const { maxRedirections = globalMaxRedirections, ...baseOpts } = opts2;
           if (!maxRedirections) {
-            return dispatch(opts2, handler2);
+            return dispatch2(opts2, handler2);
           }
           const redirectHandler = new RedirectHandler(
-            dispatch,
+            dispatch2,
             maxRedirections,
             opts2,
             handler2
           );
-          return dispatch(baseOpts, redirectHandler);
+          return dispatch2(baseOpts, redirectHandler);
         };
       };
     };
@@ -11509,15 +11509,15 @@ var require_retry = __commonJS({
     "use strict";
     var RetryHandler = require_retry_handler();
     module2.exports = (globalOpts) => {
-      return (dispatch) => {
+      return (dispatch2) => {
         return function retryInterceptor(opts, handler2) {
-          return dispatch(
+          return dispatch2(
             opts,
             new RetryHandler(
               { ...opts, retryOptions: { ...globalOpts, ...opts.retryOptions } },
               {
                 handler: handler2,
-                dispatch
+                dispatch: dispatch2
               }
             )
           );
@@ -11610,14 +11610,14 @@ var require_dump = __commonJS({
     function createDumpInterceptor({ maxSize: defaultMaxSize } = {
       maxSize: 1024 * 1024
     }) {
-      return (dispatch) => {
+      return (dispatch2) => {
         return function Intercept(opts, handler2) {
           const { dumpMaxSize = defaultMaxSize } = opts;
           const dumpHandler = new DumpHandler(
             { maxSize: dumpMaxSize },
             handler2
           );
-          return dispatch(opts, dumpHandler);
+          return dispatch2(opts, dumpHandler);
         };
       };
     }
@@ -11806,13 +11806,13 @@ var require_dns = __commonJS({
       #dispatch = null;
       #handler = null;
       #origin = null;
-      constructor(state3, { origin, handler: handler2, dispatch }, opts) {
+      constructor(state3, { origin, handler: handler2, dispatch: dispatch2 }, opts) {
         super(handler2);
         this.#origin = origin;
         this.#handler = handler2;
         this.#opts = { ...opts };
         this.#state = state3;
-        this.#dispatch = dispatch;
+        this.#dispatch = dispatch2;
       }
       onError(err) {
         switch (err.code) {
@@ -11881,11 +11881,11 @@ var require_dns = __commonJS({
         maxItems: interceptorOpts?.maxItems ?? Infinity
       };
       const instance = new DNSInstance(opts);
-      return (dispatch) => {
+      return (dispatch2) => {
         return function dnsInterceptor(origDispatchOpts, handler2) {
           const origin = origDispatchOpts.origin.constructor === URL ? origDispatchOpts.origin : new URL(origDispatchOpts.origin);
           if (isIP(origin.hostname) !== 0) {
-            return dispatch(origDispatchOpts, handler2);
+            return dispatch2(origDispatchOpts, handler2);
           }
           instance.runLookup(origin, origDispatchOpts, (err, newOrigin) => {
             if (err) {
@@ -11902,9 +11902,9 @@ var require_dns = __commonJS({
                 ...origDispatchOpts.headers
               }
             };
-            dispatch(
+            dispatch2(
               dispatchOpts,
-              instance.getHandler({ origin, dispatch, handler: handler2 }, origDispatchOpts)
+              instance.getHandler({ origin, dispatch: dispatch2, handler: handler2 }, origDispatchOpts)
             );
           });
           return true;
@@ -13596,7 +13596,7 @@ var require_fetch = __commonJS({
     function handleFetchDone(response) {
       finalizeAndReportTiming(response, "fetch");
     }
-    function fetch2(input2, init = void 0) {
+    function fetch3(input2, init = void 0) {
       webidl.argumentLengthCheck(arguments, 1, "globalThis.fetch");
       let p2 = createDeferredPromise();
       let requestObject;
@@ -14316,7 +14316,7 @@ var require_fetch = __commonJS({
         })();
       }
       try {
-        const { body: body2, status, statusText, headersList, socket } = await dispatch({ body: requestBody });
+        const { body: body2, status, statusText, headersList, socket } = await dispatch2({ body: requestBody });
         if (socket) {
           response = makeResponse({ status, statusText, headersList, socket });
         } else {
@@ -14415,7 +14415,7 @@ var require_fetch = __commonJS({
         fetchParams.controller.connection.destroy();
       }
       return response;
-      function dispatch({ body: body2 }) {
+      function dispatch2({ body: body2 }) {
         const url2 = requestCurrentURL(request2);
         const agent = fetchParams.controller.dispatcher;
         return new Promise((resolve3, reject) => agent.dispatch(
@@ -14553,7 +14553,7 @@ var require_fetch = __commonJS({
       }
     }
     module2.exports = {
-      fetch: fetch2,
+      fetch: fetch3,
       Fetch,
       fetching,
       finalizeAndReportTiming
@@ -19013,7 +19013,7 @@ var require_undici = __commonJS({
     module2.exports.setGlobalDispatcher = setGlobalDispatcher;
     module2.exports.getGlobalDispatcher = getGlobalDispatcher;
     var fetchImpl = require_fetch().fetch;
-    module2.exports.fetch = async function fetch2(init, options = void 0) {
+    module2.exports.fetch = async function fetch3(init, options = void 0) {
       try {
         return await fetchImpl(init, options);
       } catch (err) {
@@ -26273,7 +26273,7 @@ var require_public_api = __commonJS({
         return docs;
       return Object.assign([], { empty: true }, composer$1.streamInfo());
     }
-    function parseDocument2(source, options = {}) {
+    function parseDocument3(source, options = {}) {
       const { lineCounter: lineCounter2, prettyErrors } = parseOptions(options);
       const parser$1 = new parser.Parser(lineCounter2?.addNewLine);
       const composer$1 = new composer.Composer(options);
@@ -26299,7 +26299,7 @@ var require_public_api = __commonJS({
       } else if (options === void 0 && reviver && typeof reviver === "object") {
         options = reviver;
       }
-      const doc = parseDocument2(src, options);
+      const doc = parseDocument3(src, options);
       if (!doc)
         return null;
       doc.warnings.forEach((warning2) => log2.warn(doc.options.logLevel, warning2));
@@ -26335,7 +26335,7 @@ var require_public_api = __commonJS({
     }
     exports2.parse = parse4;
     exports2.parseAllDocuments = parseAllDocuments;
-    exports2.parseDocument = parseDocument2;
+    exports2.parseDocument = parseDocument3;
     exports2.stringify = stringify;
   }
 });
@@ -59024,10 +59024,10 @@ var require_binary2 = __commonJS({
             cb(buf);
           }
         };
-        dispatch();
+        dispatch2();
       }
       var offset = null;
-      function dispatch() {
+      function dispatch2() {
         if (!pending) {
           if (caughtEnd) done = true;
           return;
@@ -59144,13 +59144,13 @@ var require_binary2 = __commonJS({
                 buffers.splice(0, taken + i + search.length);
               }
               next();
-              dispatch();
+              dispatch2();
             } else {
               i = Math.max(buffers.length - search.length - offset - taken, 0);
             }
             taken += i;
           };
-          dispatch();
+          dispatch2();
         };
         self2.peek = function(cb) {
           offset = 0;
@@ -59169,7 +59169,7 @@ var require_binary2 = __commonJS({
       var buffers = Buffers();
       stream4.write = function(buf) {
         buffers.push(buf);
-        dispatch();
+        dispatch2();
       };
       var vars = Vars();
       var done = false, caughtEnd = false;
@@ -105313,8 +105313,8 @@ function isPlainObject2(value) {
 }
 var noop = () => "";
 async function fetchWrapper(requestOptions) {
-  const fetch2 = requestOptions.request?.fetch || globalThis.fetch;
-  if (!fetch2) {
+  const fetch3 = requestOptions.request?.fetch || globalThis.fetch;
+  if (!fetch3) {
     throw new Error(
       "fetch is not set. Please pass a fetch implementation as new Octokit({ request: { fetch }}). Learn more at https://github.com/octokit/octokit.js/#fetch-missing"
     );
@@ -105330,7 +105330,7 @@ async function fetchWrapper(requestOptions) {
   );
   let fetchResponse;
   try {
-    fetchResponse = await fetch2(requestOptions.url, {
+    fetchResponse = await fetch3(requestOptions.url, {
       method: requestOptions.method,
       body: body2,
       redirect: requestOptions.request?.redirect,
@@ -109168,6 +109168,41 @@ var import_node_crypto6 = require("node:crypto");
 var import_promises8 = require("node:fs/promises");
 var import_node_os4 = require("node:os");
 var import_node_path11 = require("node:path");
+
+// src/github.js
+function repositoryPath(repository) {
+  if (!/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/.test(repository) || repository.split("/")[1] === "." || repository.split("/")[1] === "..") {
+    throw new Error("repository must be owner/name");
+  }
+  return `/repos/${repository}`;
+}
+function positiveId(value, label) {
+  if (!/^[1-9][0-9]*$/.test(String(value)) || !Number.isSafeInteger(Number(value)))
+    throw new Error(`${label} must be one positive integer`);
+  return Number(value);
+}
+function githubApi(token, fetcher = fetch) {
+  if (!token) throw new Error("token is required for cross-run GitHub API access");
+  return async (path4, { method = "GET", body: body2 } = {}) => {
+    const response = await fetcher(`https://api.github.com${path4}`, {
+      method,
+      redirect: "error",
+      signal: AbortSignal.timeout(3e4),
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2026-03-10",
+        "Content-Type": "application/json"
+      },
+      ...body2 === void 0 ? {} : { body: JSON.stringify(body2) }
+    });
+    if (!response.ok) throw new Error(`GitHub ${method} ${path4} failed (HTTP ${response.status})`);
+    if (response.status === 204) return null;
+    return response.json();
+  };
+}
+
+// src/transfer.js
 function contextFor(env, name) {
   for (const field of ["GITHUB_REPOSITORY", "GITHUB_RUN_ID", "GITHUB_SHA"]) {
     if (!env[field]) throw new Error(`Missing ${field}; artifact transfers must run inside GitHub Actions`);
@@ -109193,20 +109228,35 @@ async function upload({ client: client2, directory, visibility = "encrypted", ke
     await (0, import_promises8.rm)((0, import_node_path11.dirname)(archive), { recursive: true, force: true });
   }
 }
-async function download({ client: client2, artifactId, directory, visibility = "encrypted", key, env = process.env, tempRoot = (0, import_node_os4.tmpdir)() }) {
+async function remoteArtifact({ repository, runId, workflow, branch, token, api = githubApi(token) }, id) {
+  const base = repositoryPath(repository);
+  positiveId(runId, "source-run-id");
+  if (!/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/.test(workflow ?? "")) throw new Error("source-workflow must be .github/workflows/<filename>.yml");
+  if (!branch || typeof branch !== "string") throw new Error("source-branch must be a trusted branch name");
+  const run2 = await api(`${base}/actions/runs/${runId}`);
+  if (run2.id !== Number(runId) || run2.path !== workflow || run2.head_branch !== branch || run2.event !== "workflow_dispatch" || !/^[a-f0-9]{40}$/.test(run2.head_sha ?? "") || run2.head_repository?.full_name?.toLowerCase() !== repository.toLowerCase()) {
+    throw new Error("Source run does not match the trusted repository, workflow, branch, and workflow_dispatch event");
+  }
+  const artifact = await api(`${base}/actions/artifacts/${id}`);
+  if (artifact.id !== id || artifact.expired || artifact.workflow_run?.id !== Number(runId) || artifact.workflow_run?.head_sha !== run2.head_sha) throw new Error("Artifact does not belong to the source run or has expired");
+  const [repositoryOwner, repositoryName] = repository.split("/");
+  return { artifact, env: { GITHUB_REPOSITORY: run2.head_repository.full_name, GITHUB_RUN_ID: String(run2.id), GITHUB_SHA: run2.head_sha }, findBy: { repositoryOwner, repositoryName, workflowRunId: Number(runId), token } };
+}
+async function download({ client: client2, artifactId, directory, visibility = "encrypted", key, source, expectedDigest, env = process.env, tempRoot = (0, import_node_os4.tmpdir)() }) {
   checkOptions(visibility, key);
   if (!/^[1-9][0-9]*$/.test(String(artifactId)) || !Number.isSafeInteger(Number(artifactId))) throw new Error("artifact-id must be one positive integer; pass the upstream job output");
   const id = Number(artifactId);
-  const { artifacts } = await client2.listArtifacts();
-  const artifact = artifacts.find((item) => item.id === id);
+  const remote = source ? await remoteArtifact(source, id) : void 0;
+  const artifact = remote?.artifact ?? (await client2.listArtifacts()).artifacts.find((item) => item.id === id);
   if (!artifact) throw new Error(`Artifact ${id} was not found in this run; rebuild its producer if it expired`);
-  const context5 = contextFor(env, artifact.name);
+  const context5 = contextFor(remote?.env ?? env, artifact.name);
   const digest = artifact.digest?.replace(/^sha256:/, "");
   if (!/^[a-fA-F0-9]{64}$/.test(digest ?? "")) throw new Error(`Artifact ${id} has no valid SHA-256 digest`);
+  if (expectedDigest && expectedDigest.replace(/^sha256:/, "").toLowerCase() !== digest.toLowerCase()) throw new Error("Artifact digest does not match expected-digest");
   const expectedHash = `sha256:${digest.toLowerCase()}`;
   const scratch = await (0, import_promises8.mkdtemp)((0, import_node_path11.join)(tempRoot, "buildgraph-download-"));
   try {
-    const result = await client2.downloadArtifact(id, { path: scratch, expectedHash });
+    const result = await client2.downloadArtifact(id, { path: scratch, expectedHash, ...remote ? { findBy: remote.findBy } : {} });
     if (result.digestMismatch !== false) throw new Error(`Artifact ${id} digest verification failed`);
     const archive = (0, import_node_path11.join)(scratch, visibility === "encrypted" ? "output.bgenc" : "output.tar.gz");
     return await unpack({ archive, directory, visibility, key, context: context5, tempRoot });
@@ -109215,12 +109265,68 @@ async function download({ client: client2, artifactId, directory, visibility = "
   }
 }
 
+// src/dispatch.js
+var import_yaml2 = __toESM(require_dist(), 1);
+function dispatchInputs(source = "") {
+  const doc = (0, import_yaml2.parseDocument)(source, { version: "1.2" });
+  if (doc.errors.length) throw new Error("inputs must be valid YAML with unique keys");
+  const inputs = doc.toJS({ maxAliasCount: 20 }) ?? {};
+  if (!inputs || Array.isArray(inputs) || typeof inputs !== "object" || Object.keys(inputs).length > 25)
+    throw new Error("inputs must be a YAML mapping of at most 25 scalar values");
+  for (const [name, value] of Object.entries(inputs)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name) || !["string", "boolean", "number"].includes(typeof value) || typeof value === "number" && !Number.isFinite(value)) {
+      throw new Error("inputs must contain named string, boolean, or finite number values");
+    }
+  }
+  return inputs;
+}
+async function dispatch({ repository, workflow, ref, inputs = "", token, api = githubApi(token) }) {
+  const base = repositoryPath(repository);
+  if (!/^[A-Za-z0-9_.-]+\.ya?ml$/.test(workflow))
+    throw new Error("workflow must be a .yml or .yaml filename");
+  if (typeof ref !== "string" || !ref.trim()) throw new Error("ref must name a target branch or tag");
+  const result = await api(`${base}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`, {
+    method: "POST",
+    body: { ref, inputs: dispatchInputs(inputs) }
+  });
+  if (!result?.workflow_run_id)
+    throw new Error(
+      "GitHub accepted dispatch without a run ID; inspect the target Actions page before retrying"
+    );
+  const runId = positiveId(result.workflow_run_id, "workflow_run_id");
+  return { runId, url: `https://github.com/${repository}/actions/runs/${runId}` };
+}
+async function waitForRun({
+  repository,
+  runId,
+  token,
+  timeoutSeconds = 1800,
+  api = githubApi(token),
+  now = Date.now,
+  sleep = (ms2) => new Promise((resolve3) => setTimeout(resolve3, ms2))
+}) {
+  const base = repositoryPath(repository);
+  positiveId(runId, "run-id");
+  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 21600)
+    throw new Error("timeout-seconds must be an integer between 1 and 21600");
+  const deadline = now() + timeoutSeconds * 1e3;
+  while (now() < deadline) {
+    const run2 = await api(`${base}/actions/runs/${runId}`);
+    if (run2.id !== Number(runId)) throw new Error("GitHub returned a different run");
+    if (run2.status === "completed") return run2.conclusion;
+    await sleep(Math.min(1e4, Math.max(0, deadline - now())));
+  }
+  throw new Error(`Timed out waiting for run ${runId}; it was not cancelled. Inspect it before retrying`);
+}
+
 // src/action.js
 var input = (name) => getInput(name);
 var required = (name) => getInput(name, { required: true });
 async function main(operation) {
   const key = input("key");
   if (key) setSecret(key);
+  const token = input("token");
+  if (token) setSecret(token);
   if (operation === "plan") {
     const workflow = await readWorkflow(required("workflow"));
     const plannerJob = input("planner-job") || "plan";
@@ -109243,7 +109349,26 @@ async function main(operation) {
       setOutput("artifact-id", result.id);
       setOutput("artifact-name", result.name);
       setOutput("artifact-digest", result.digest);
-    } else setOutput("path", await download({ ...options, artifactId: required("artifact-id") }));
+    } else {
+      const remote = ["source-repository", "source-run-id", "source-workflow", "source-branch", "token"].some((name) => input(name));
+      const source = remote ? { repository: required("source-repository"), runId: required("source-run-id"), workflow: required("source-workflow"), branch: required("source-branch"), token: required("token") } : void 0;
+      setOutput("path", await download({ ...options, artifactId: required("artifact-id"), source, expectedDigest: input("expected-digest") }));
+    }
+  } else if (operation === "dispatch") {
+    const wait = input("wait") || "false";
+    if (!["true", "false"].includes(wait)) throw new Error("wait must be true or false");
+    const timeoutSeconds = Number(input("timeout-seconds") || "1800");
+    if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 21600) throw new Error("timeout-seconds must be an integer between 1 and 21600");
+    const options = { repository: required("repository"), workflow: required("workflow"), ref: required("ref"), inputs: input("inputs"), token: required("token") };
+    const result = await dispatch(options);
+    setOutput("run-id", result.runId);
+    setOutput("run-url", result.url);
+    info(`Dispatched ${result.url}`);
+    if (wait === "true") {
+      const conclusion = await waitForRun({ ...options, runId: result.runId, timeoutSeconds });
+      setOutput("conclusion", conclusion);
+      if (conclusion !== "success") throw new Error(`Remote run concluded ${conclusion}: ${result.url}`);
+    }
   } else if (operation === "prepare") {
     await (0, import_promises9.mkdir)(required("directory"), { recursive: true });
     await (0, import_promises9.mkdir)(required("inputs-directory"), { recursive: true });

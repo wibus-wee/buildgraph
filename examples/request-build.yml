@@ -1,0 +1,43 @@
+name: Request photo build
+run-name: Request photo · ${{ github.run_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Private photo source branch, tag, or SHA
+        type: string
+        default: main
+permissions:
+  contents: read
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: wibus-wee/buildgraph
+          ref: main # Pin an audited Buildgraph commit in production.
+          path: hub
+          persist-credentials: false
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        id: hub-token
+        with:
+          client-id: ${{ vars.BUILD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BUILD_APP_PRIVATE_KEY }}
+          owner: my
+          repositories: buildgraph
+          permission-actions: write
+      - uses: ./hub/dispatch
+        id: build
+        with:
+          repository: my/buildgraph
+          workflow: project-photo.yml
+          ref: main
+          token: ${{ steps.hub-token.outputs.token }}
+          wait: 'true'
+          timeout-seconds: '3500'
+          inputs: |
+            target: deliver
+            source_ref: ${{ toJSON(inputs.source_ref) }}
+            request_id: ${{ toJSON(format('{0}/{1}', github.repository, github.run_id)) }}

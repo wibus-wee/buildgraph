@@ -6,6 +6,8 @@
 
 项目规模增大后，可以在中央 repo 内拆分 workflows。planner 的图边界是一份 workflow；不要用 `needs` 引用另一份 workflow 的 job。跨 workflows 共用配置使用仓库 vars、secrets 和原生复用机制，不假设顶层 env 会自动跨文件继承。
 
+跨组织接入先读[分发接入](./distribution.md)，明确源码、中央构建、每个发布目的地的权限边界。维护者固定接收方信任的 repository/workflow/branch，调用方只传运行与产物标识。request_id 用于关联，不是认证或去重机制。向导产出的 YAML 是普通初稿；提交之后直接维护该文件，不新增 manifest。
+
 ## 给 Agent 一个可执行的任务
 
 说明要接入的源码仓库、job ID、依赖的 jobs、源码 ref、runner 和工具链、构建命令、输出目录，以及产物应保持加密还是允许公开。引用现有 secret 名称即可，不要把令牌值或产物密钥贴进任务、提交或运行日志。
@@ -39,6 +41,8 @@ actionlint -shellcheck='' .github/workflows/*.yml examples/*.yml
 ```
 
 加密或传输行为变更需要覆盖认证失败、错误输入、临时目录清理和真实传递。图文修改检查链接、场景可编辑性和 PNG 阅读效果，不需要为了文案重复触发带私有源码凭证的构建。
+
+修改 Pages 时运行 `npm run build:site`，用静态服务器预览 `_site/`，检查三种分发模式、YAML 下载、GitHub 编辑入口和窄屏布局。跨运行传输改动使用 handoff-test.yml 验证完整 round trip；它只消费合成测试内容，不发布 Release。跨组织 installation 权限仍需在实际组织验证，不能从同仓库测试推断通过。
 
 提交前审阅 diff，尤其是新增的 checkout 仓库、上传目录、`visibility: public`、权限、environment 和 Release 命令。按任务授权提交、推送与 dispatch；验证构建优先选择只构建的目标，不把 `publish` 当成通用测试目标。
 

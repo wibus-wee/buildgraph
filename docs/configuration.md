@@ -103,17 +103,18 @@ env:
 
 ## Action inputs
 
-推荐直接 uses 三个独立入口，无须设置 operation：
+推荐直接 uses 独立入口，无须设置 operation：
 
 | 入口 | 输入 | 结果 |
 | --- | --- | --- |
 | [plan](../plan/action.yml) | 必填 `workflow`；可选 `target`、`planner-job`（默认 plan） | 输出 `selected` 数组字符串，供原生 `fromJSON` 消费 |
 | [upload](../upload/action.yml) | 必填 `path`；可选 `visibility`、`key`、`retention-days` | 打包并上传，输出 `artifact-id`、`artifact-name`、`artifact-digest` |
 | [download](../download/action.yml) | 必填 `artifact-id`、`path`；可选 `visibility`、`key` | 下载、验证并恢复；输出 `path` 绝对路径 |
+| [dispatch](../dispatch/action.yml) | 必填 `repository`、`workflow`、`ref`、`token`；可选 YAML `inputs`、`wait`、`timeout-seconds` | 输出 `run-id`、`run-url` 与等待时的 `conclusion` |
 
 上传和下载的 visibility 都默认 `encrypted`，需提供 64 个 hex 字符的 key。双方显式 `visibility: public` 才能传递明文 tar.gz，不自动降级。使用 `secrets.BUILDGRAPH_ARTIFACT_KEY` 传递 key，生产者和消费者必须取得相同值，尤其注意 environment 中的同名 secret 覆盖。
 
-context 和 artifact 名自动生成，不需要配置。每次上传都有唯一名称，矩阵并行上传也不会冲突。消费者只接受同一 run 内的一个 artifact ID，不按名称搜索最新产物；仍需为矩阵消费者明确列出对应 ID。不要通过矩阵 job 的单个输出聚合所有子任务产物，GitHub 不保证这个输出代表哪个子任务。
+context 和 artifact 名自动生成，不需要配置。每次上传都有唯一名称，矩阵并行上传也不会冲突。消费者默认只接受同一 run 内的一个 artifact ID，不按名称搜索最新产物；仍需为矩阵消费者明确列出对应 ID。不要通过矩阵 job 的单个输出聚合所有子任务产物，GitHub 不保证这个输出代表哪个子任务。
 
 `path` 是一个目录，不支持 glob。上传目录必须存在且非空；下载目标必须尚不存在，父目录自动创建。`retention-days` 默认 7，0 使用仓库默认值，平台可按仓库上限缩短保留时间。打包和传输的临时文件在成功或失败后清理；runner 被强制终止时仍依赖 runner 的生命周期清理。
 
@@ -126,7 +127,9 @@ outputs:
   artifact_id: ${{ steps.upload.outputs.artifact-id }}
 ```
 
-传输使用 GitHub Actions 的运行时凭证，不需要另传 token，只支持 GitHub.com 上的当前 run；同一 run 的早期 attempt 产物也可使用。列举采用官方 SDK，最多可查到 1000 个 run artifacts；超过限制时查不到的 ID 会失败，不会换用其他产物。下载 digest 缺失或不匹配时失败。长期或匿名分发可通过最后一个 job 发布到中央仓库 Releases；示例使用项目名前缀区分版本。
+默认传输使用 GitHub Actions 的运行时凭证，不需要另传 token，读取 GitHub.com 上的当前 run；同一 run 的早期 attempt 产物也可使用。当前运行的列举采用官方 SDK，最多可查到 1000 个 run artifacts；超过限制时查不到的 ID 会失败，不会换用其他产物。下载 digest 缺失或不匹配时失败，可用 `expected-digest` 额外绑定生产者返回的摘要。
+
+跨运行下载需同时指定 `source-repository`、`source-run-id`、`source-workflow`、`source-branch` 和 `token`，固定信任的来源后按不可变 artifact ID 读取。跨组织 dispatch、完整来源校验契约和中央/远端 Release 示例由[分发接入文档](./distribution.md)维护。
 
 根 [action.yml](../action.yml) 保留低层兼容入口：`operation: plan` 使用相同 planner inputs；`prepare` 接收 `directory`、`inputs-directory`、`source-directory`，创建目录并记录源码 SHA；`pack` 接收 `directory`、`visibility`、`key`、显式 `context`，输出临时 `archive`；`unpack` 额外接收 `archive` 并恢复目录。低层 pack/unpack 不负责网络传输，其加密模式必须由调用方传入同一非空 context；不要与新的自动上下文传输混用。
 

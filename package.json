@@ -20,6 +20,7 @@
     "plan",
     "upload",
     "download",
+    "dispatch",
     "action.yml",
     "README.md",
     "docs",
@@ -27,8 +28,9 @@
   ],
   "scripts": {
     "build": "node scripts/build.js",
+    "build:site": "node scripts/build-site.js",
     "test": "node --test",
-    "check": "npm test && node bin/buildgraph.js validate && node bin/buildgraph.js validate examples/private-projects.yml && node bin/buildgraph.js validate examples/independent-projects.yml"
+    "check": "npm test && node bin/buildgraph.js validate && node bin/buildgraph.js validate examples/private-projects.yml && node bin/buildgraph.js validate examples/independent-projects.yml && node bin/buildgraph.js validate examples/project-photo.yml && node bin/buildgraph.js validate examples/project-backup.yml"
   },
   "repository": {
     "type": "git",

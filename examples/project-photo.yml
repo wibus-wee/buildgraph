@@ -1,0 +1,118 @@
+# Review repository permissions, build commands, and output visibility before merging.
+name: photo
+run-name: photo · ${{ inputs.request_id || github.run_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: build or deliver (publishes outputs)
+        type: choice
+        options:
+          - build
+          - deliver
+        default: build
+      source_ref:
+        description: Source branch, tag, or commit SHA
+        type: string
+        default: main
+      request_id:
+        description: Optional correlation ID; not an authorization credential
+        type: string
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      selected: ${{ steps.graph.outputs.selected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: ./hub/plan
+        id: graph
+        with:
+          workflow: hub/.github/workflows/project-photo.yml
+          target: ${{ inputs.target }}
+  build:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'build') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: your-org/private-photo
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_READ_TOKEN }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Build
+        working-directory: source
+        run: |-
+          npm ci
+          npm run build
+      - uses: ./hub/upload
+        id: upload
+        with:
+          path: source/dist
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+  deliver:
+    needs:
+      - plan
+      - build
+    if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'deliver') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: org-a/photo-distribution
+            owner: org-a
+            name: photo-distribution
+          - repository: org-b/photo-mirror
+            owner: org-b
+            name: photo-mirror
+    concurrency:
+      group: photo-deliver-${{ matrix.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        id: destination
+        with:
+          client-id: ${{ vars.DISTRIBUTION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DISTRIBUTION_APP_PRIVATE_KEY }}
+          owner: ${{ matrix.owner }}
+          repositories: ${{ matrix.name }}
+          permission-actions: write
+      - uses: ./hub/dispatch
+        id: publish
+        with:
+          repository: ${{ matrix.repository }}
+          workflow: publish.yml
+          ref: main
+          token: ${{ steps.destination.outputs.token }}
+          wait: "true"
+          inputs: |
+            source_run_id: ${{ toJSON(github.run_id) }}
+            artifact_id: ${{ toJSON(needs.build.outputs.artifact_id) }}
+            artifact_digest: ${{ toJSON(needs.build.outputs.artifact_digest) }}
+            request_id: ${{ toJSON(inputs.request_id || github.run_id) }}

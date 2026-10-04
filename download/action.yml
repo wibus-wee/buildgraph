@@ -1,8 +1,8 @@
 name: Buildgraph download
-description: Download one artifact from this run, verify, decrypt, and restore its directory
+description: Download one artifact from this run or an explicitly trusted remote workflow
 inputs:
   artifact-id:
-    description: One artifact ID from the upstream job output
+    description: One immutable artifact ID from the producer upload output
     required: true
   path:
     description: Destination directory, which must not already exist
@@ -12,6 +12,18 @@ inputs:
   visibility:
     description: encrypted or public; must match the producer
     default: encrypted
+  source-repository:
+    description: Trusted producer owner/repository; omit all source inputs for current-run download
+  source-run-id:
+    description: Exact producer run ID
+  source-workflow:
+    description: Trusted producer workflow path, e.g. .github/workflows/build.yml
+  source-branch:
+    description: Trusted producer branch, e.g. main
+  token:
+    description: Token with Actions read on the source repository; required for cross-run download
+  expected-digest:
+    description: Optional SHA-256 digest from the producer upload output
 outputs:
   path:
     description: Absolute path of the restored directory

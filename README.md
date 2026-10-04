@@ -2,7 +2,9 @@
 
 **用一个公开 GitHub 仓库，构建和分发许多互不相关的私有项目。**
 
-一个网站、一个备份工具、一个照片应用，可以没有任何产品关系，也可以用完全不同的语言和版本号。它们的源码各自闭源，只共用这个公开的构建中心：统一放 workflows、可复用的配置，以及各项目自己的产物。不需要给每个私有项目再开一个 distribution repo。
+一个网站、一个备份工具、一个照片应用，可以没有任何产品关系，也可以用完全不同的语言和版本号。它们的源码各自闭源，只共用这个公开的构建中心：统一放 workflows、可复用的配置，以及各项目自己的产物。产物可留在中央仓库，也可分发到不同组织自己的 distribution repo。
+
+[打开接入向导](https://wibus-wee.github.io/buildgraph/) · [跨组织分发与双向触发](./docs/distribution.md)
 
 [![Buildgraph：私有源码经各 job checkout 进入中央公开仓库的构建链；Agent 修改同一份 YAML，经校验和审阅后触发运行。](./docs/diagrams/buildgraph.png)](./docs/diagrams/buildgraph.png)
 
@@ -12,7 +14,7 @@
 
 上方选择 `target=site`，本次只构建网站，其他项目跳过。选择 `site,backup` 可以在一次运行中构建两个独立项目；它们不会因此被合并成一个产品。`plan` 读取同一份 YAML，只有发现真实的 `needs` 依赖时才补上必要的上游，GitHub 本身负责调度和失败传播。
 
-图展示接入私有项目后的结构，产物出口按项目区分；使用 artifact 还是公开 Release，由各自的 workflow 决定。仓库自带的 demo 使用本地示例代码，包含一个独立目标和一条有依赖的链路，不需要你的真实源码，也不会创建 Release。
+图展示接入私有项目后的结构，产物出口按项目区分；使用 artifact、中央 Release，还是跨组织发布，由各自 workflow 决定。分发仓库也能反向请求中央构建。Pages 帮你准备同一份 YAML，审阅提交后才进入构建链。仓库自带 demo 使用本地示例代码，不需要你的真实源码，也不会创建 Release。
 
 ## 先跑通一次
 
@@ -35,6 +37,8 @@ gh workflow run build.yml -f target=independent
 只看计划、不执行构建时，在 demo 的表单勾选 `plan_only`。演示的其他目标用于验证依赖链，接入独立项目不需要使用它们。
 
 ## 换成你的私有项目
+
+可以先用 [Pages 接入向导](https://wibus-wee.github.io/buildgraph/) 填写构建中心、源码仓库、命令和输出目录，预览后把 YAML 加入你的仓库。选择“保留加密产物”即可从独立项目开始；需要跨组织分发时再选择 Release 或远端 publish.yml。页面只准备普通 YAML，后续你和 Agent 直接编辑这个文件。
 
 从 [independent-projects.yml](./examples/independent-projects.yml) 开始：一个 Node.js 网站 `site`，一个 Go 备份工具 `backup`。两个 job 都只依赖 planner，不依赖彼此，也不互相下载产物。
 
@@ -75,13 +79,17 @@ desktop:
 
 这里的 `needs: plan` 只是在等目标选择结果，不代表依赖另一个产品。`if` 控制该 job 是否属于本次选择。复制 job 时，条件中的 `'desktop'` 必须与新 job 的 ID 一致。
 
-三个 Action 各自只做一件事：`plan` 选出目标及必要上游，`upload` 上传该项目的输出目录，`download` 在确实需要另一个 job 的产物时恢复它。独立项目通常只用 plan 和 upload。
+`plan` 选出目标及必要上游，`upload` 上传该项目的输出目录，`download` 恢复明确指定的产物；独立项目通常只用 plan 和 upload。需要跨 workflow 时，`dispatch` 触发对方的原生 workflow，并可等待结果。
 
 只有真实依赖才增加项目间的边。例如 app 需要 core 的构建结果，才写 `needs: [plan, core]`，再通过 artifact ID 显式 download；仅写 needs 不会自动传文件。[依赖项目示例](./examples/private-projects.yml)展示了 `core → app → publish`。选择 publish 会公开发布 app，需要先配置 production environment；不要把这个目标当作所有项目的统一终点。
 
-目录、权限、源码 ref、共享变量和发布步骤仍由原生 Actions YAML 管理。所有 input 的精确定义见[工作流接入](./docs/configuration.md)；已有自己的 build repo 时，可以[直接引用这三个 Action](./docs/reuse.md)，不必 Fork。
+目录、权限、源码 ref、共享变量和发布步骤仍由原生 Actions YAML 管理。所有 input 的精确定义见[工作流接入](./docs/configuration.md)；已有自己的 build repo 时，可以[直接引用这些 Action](./docs/reuse.md)，不必 Fork。
 
 项目多了，可以在同一个 build repo 里按项目或分组拆成多个 workflow。共享仓库不等于必须维护一张巨大的图：planner 只选择它所读取的那份 workflow 中的 jobs，`needs` 也只连接同一 workflow 内的节点。
+
+## 分发到不同组织
+
+跨组织分发从 [project-backup.yml](./examples/project-backup.yml) 的直接 Release 或 [project-photo.yml](./examples/project-photo.yml) 的远端发布开始；两者默认只 build，选择 deliver 才分发。在分发仓库安装 [request-build.yml](./examples/request-build.yml) 和 [publish.yml](./examples/publish.yml)，可从那里请求中央构建再接回结果。[接入步骤](./docs/distribution.md)说明各文件位置、App 授权、来源校验和重跑行为。
 
 ## 让 Agent 帮你维护
 

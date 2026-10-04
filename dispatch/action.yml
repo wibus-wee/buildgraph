@@ -1,0 +1,34 @@
+name: Buildgraph dispatch
+description: Dispatch a native workflow with YAML inputs and optionally wait for its exact run
+inputs:
+  repository:
+    description: Target owner/repository
+    required: true
+  workflow:
+    description: Target workflow filename, including .yml or .yaml
+    required: true
+  ref:
+    description: Branch or tag of the target workflow
+    required: true
+  token:
+    description: Token with Actions write permission on the target repository
+    required: true
+  inputs:
+    description: YAML mapping of the target workflow's dispatch inputs
+    default: '{}'
+  wait:
+    description: Wait for completion and fail unless the remote conclusion is success
+    default: 'false'
+  timeout-seconds:
+    description: Wait deadline; does not cancel the remote run
+    default: '1800'
+outputs:
+  run-id:
+    description: Exact dispatched workflow run ID
+  run-url:
+    description: Link to the dispatched run
+  conclusion:
+    description: Remote conclusion when wait is true
+runs:
+  using: node24
+  main: index.cjs

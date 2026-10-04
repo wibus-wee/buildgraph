@@ -12,6 +12,8 @@
 | 传输 | [transfer.js](../src/transfer.js) | 官方 artifact SDK、自动 context、digest 校验、临时文件生命周期 |
 | 产物协议 | [artifacts.js](../src/artifacts.js) | tar 打包、加密、认证、受限解包 |
 | 本地工具 | [CLI](../bin/buildgraph.js) | 校验、查看计划、生成新密钥 |
+| 跨仓库触发 | [dispatch](../dispatch/action.yml)、[dispatch.js](../src/dispatch.js)、[github.js](../src/github.js) | YAML inputs、精确 run ID、有限等待与 API 边界 |
+| 接入页面 | [site/](../site/)、[build-site.js](../scripts/build-site.js) | 从实际 workflows 派生目录，准备供审阅的原生 YAML 初稿 |
 
 ## 执行
 
@@ -21,7 +23,11 @@ GitHub 的 `needs` 保持原样：公共依赖只有一个 job，独立分支可
 
 读取使用 YAML 1.2，保留 `on` 键，支持 anchors 和 aliases，拒绝重复键、无效 needs、缺失依赖和循环。GitHub/actionlint 负责完整的工作流语法。Planner 可分析原生矩阵与 reusable workflow job 的外层依赖，但不会展开其内部节点。
 
-构建 job 显式 checkout 私有源码，用 download 恢复上游产物，执行构建，再用 upload 上传指定输出目录。目录、认证、变量和权限直接写在 YAML 中。三个 Action 共用打包后的 JS 入口，传输只调用官方 `@actions/artifact` SDK；库的 pack/unpack 保持独立，不隐式访问网络。
+构建 job 显式 checkout 私有源码，用 download 恢复上游产物，执行构建，再用 upload 上传指定输出目录。目录、认证、变量和权限直接写在 YAML 中。所有 Action 共用打包后的 JS 入口，文件传输调用官方 `@actions/artifact` SDK；来源元数据和 dispatch 使用 GitHub REST API。库的 pack/unpack 保持独立，不隐式访问网络。
+
+跨组织分发由中央 job 直接创建远端 Release，或 dispatch 远端发布 workflow。“请求构建”和“接收发布”是不同入口，结果不会再次路由为构建请求。跨 workflow 不扩展 planner 的图边界，等待属于独立 dispatch step。[分发接入](./distribution.md)定义身份、失败和重跑契约。
+
+Pages 是静态网站，目录来自实际 workflows，向导输出可审阅的 YAML 初稿。页面不保存第二份项目配置、不写仓库、不接收密钥；GitHub 负责提交权限及实际执行。提交后的 YAML 由维护者直接修改，不要求重新生成。
 
 ## 失败与重跑
 
@@ -33,7 +39,7 @@ GitHub 的 `needs` 保持原样：公共依赖只有一个 job，独立分支可
 
 ## 产物协议
 
-文件先封装成 portable gzip tar。加密格式是 `BG01 | nonce(12) | tag(16) | ciphertext`，采用 AES-256-GCM。附加认证数据为格式标记加 context。传输层生成的 context 是 `["buildgraph-transfer-v1", repository, run_id, sha, artifact_name]` 的 JSON 字符串；这是内部认证编码，用户配置仍只有原生 YAML。下载端从当前 run 的平台元数据按 artifact ID 取得原名称，因此不需要用户重复填写生产者和 attempt。
+文件先封装成 portable gzip tar。加密格式是 `BG01 | nonce(12) | tag(16) | ciphertext`，采用 AES-256-GCM。附加认证数据为格式标记加 context。传输层生成的 context 是 `["buildgraph-transfer-v1", repository, run_id, sha, artifact_name]` 的 JSON 字符串；这是内部认证编码，用户配置仍只有原生 YAML。下载端从平台元数据按 artifact ID 取得原名称。跨运行时先验证来源，再从生产者 run 的元数据重建 context，不采用接收者的 repo/run/SHA。
 
 加密完成后才把 archive 路径交给 SDK 上传。下载端必须取得并验证平台 SHA-256 digest，再在临时文件中验证完整认证标签，然后检查 archive 路径及类型，最后解包到临时目录并移动到目标。拒绝路径穿越、绝对路径、链接、`.git` 和特殊文件；失败不会暴露恢复了一半的 inputs 目录。传输层在 finally 清理 archive 临时目录；已成功上传但消费者失败的 artifact 保留到过期，便于重跑。
 

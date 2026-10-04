@@ -1,0 +1,41 @@
+name: Handoff receiver test
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Handoff test producer run ID
+        type: string
+        required: true
+      artifact_id:
+        description: Encrypted fixture artifact ID
+        type: string
+        required: true
+      artifact_digest:
+        description: Producer digest
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  receive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: ./hub/download
+        with:
+          source-repository: ${{ github.repository }}
+          source-workflow: .github/workflows/handoff-test.yml
+          source-branch: main
+          source-run-id: ${{ inputs.source_run_id }}
+          artifact-id: ${{ inputs.artifact_id }}
+          expected-digest: ${{ inputs.artifact_digest }}
+          token: ${{ github.token }}
+          path: restored
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+      - name: Verify recovered fixture
+        run: test "$(cat restored/result.txt)" = 'buildgraph encrypted handoff fixture'

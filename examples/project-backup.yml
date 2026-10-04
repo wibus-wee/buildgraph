@@ -1,0 +1,118 @@
+# Review repository permissions, build commands, and output visibility before merging.
+name: backup
+run-name: backup · ${{ inputs.request_id || github.run_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: build or deliver (publishes outputs)
+        type: choice
+        options:
+          - build
+          - deliver
+        default: build
+      source_ref:
+        description: Source branch, tag, or commit SHA
+        type: string
+        default: main
+      request_id:
+        description: Optional correlation ID; not an authorization credential
+        type: string
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      selected: ${{ steps.graph.outputs.selected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: ./hub/plan
+        id: graph
+        with:
+          workflow: hub/.github/workflows/project-backup.yml
+          target: ${{ inputs.target }}
+  build:
+    needs: plan
+    if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'build') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: your-org/private-backup
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_READ_TOKEN }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: source/go.mod
+          cache: false
+      - name: Build
+        working-directory: source
+        run: |-
+          mkdir -p dist
+          go build -o dist/backup ./cmd/backup
+      - uses: ./hub/upload
+        id: upload
+        with:
+          path: source/dist
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+  deliver:
+    needs:
+      - plan
+      - build
+    if: ${{ contains(fromJSON(needs.plan.outputs.selected), 'deliver') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: org-c/backup-distribution
+            owner: org-c
+            name: backup-distribution
+    concurrency:
+      group: backup-deliver-${{ matrix.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        id: destination
+        with:
+          client-id: ${{ vars.DISTRIBUTION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DISTRIBUTION_APP_PRIVATE_KEY }}
+          owner: ${{ matrix.owner }}
+          repositories: ${{ matrix.name }}
+          permission-contents: write
+      - uses: ./hub/download
+        with:
+          artifact-id: ${{ needs.build.outputs.artifact_id }}
+          path: release-output
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ steps.destination.outputs.token }}
+          DESTINATION: ${{ matrix.repository }}
+          RELEASE_TAG: backup-${{ github.run_id }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          BUILD_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |-
+          tar -czf "$RUNNER_TEMP/output.tar.gz" -C release-output .
+          gh release create "$RELEASE_TAG" "$RUNNER_TEMP/output.tar.gz" --repo "$DESTINATION" --title "$RELEASE_TAG" --notes "Build: $BUILD_URL; request: $REQUEST_ID"

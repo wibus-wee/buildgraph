@@ -6,6 +6,7 @@ import { pack, unpack } from './artifacts.js';
 import { dependencies, diagnoseWiring, plan, readWorkflow } from './graph.js';
 import { DefaultArtifactClient } from '@actions/artifact';
 import { upload, download } from './transfer.js';
+import { dispatch, waitForRun } from './dispatch.js';
 
 const input = name => core.getInput(name);
 const required = name => core.getInput(name, { required: true });
@@ -13,6 +14,8 @@ const required = name => core.getInput(name, { required: true });
 async function main(operation) {
   const key = input('key');
   if (key) core.setSecret(key);
+  const token = input('token');
+  if (token) core.setSecret(token);
   if (operation === 'plan') {
     const workflow = await readWorkflow(required('workflow'));
     const plannerJob = input('planner-job') || 'plan';
@@ -34,7 +37,26 @@ async function main(operation) {
       core.setOutput('artifact-id', result.id);
       core.setOutput('artifact-name', result.name);
       core.setOutput('artifact-digest', result.digest);
-    } else core.setOutput('path', await download({ ...options, artifactId: required('artifact-id') }));
+    } else {
+      const remote = ['source-repository', 'source-run-id', 'source-workflow', 'source-branch', 'token'].some(name => input(name));
+      const source = remote ? { repository: required('source-repository'), runId: required('source-run-id'), workflow: required('source-workflow'), branch: required('source-branch'), token: required('token') } : undefined;
+      core.setOutput('path', await download({ ...options, artifactId: required('artifact-id'), source, expectedDigest: input('expected-digest') }));
+    }
+  } else if (operation === 'dispatch') {
+    const wait = input('wait') || 'false';
+    if (!['true', 'false'].includes(wait)) throw new Error('wait must be true or false');
+    const timeoutSeconds = Number(input('timeout-seconds') || '1800');
+    if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 21600) throw new Error('timeout-seconds must be an integer between 1 and 21600');
+    const options = { repository: required('repository'), workflow: required('workflow'), ref: required('ref'), inputs: input('inputs'), token: required('token') };
+    const result = await dispatch(options);
+    core.setOutput('run-id', result.runId);
+    core.setOutput('run-url', result.url);
+    core.info(`Dispatched ${result.url}`);
+    if (wait === 'true') {
+      const conclusion = await waitForRun({ ...options, runId: result.runId, timeoutSeconds });
+      core.setOutput('conclusion', conclusion);
+      if (conclusion !== 'success') throw new Error(`Remote run concluded ${conclusion}: ${result.url}`);
+    }
   } else if (operation === 'prepare') {
     await mkdir(required('directory'), { recursive: true });
     await mkdir(required('inputs-directory'), { recursive: true });

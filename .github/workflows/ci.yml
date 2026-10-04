@@ -22,6 +22,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npm run check
+      - run: npm run build:site
       - name: Verify committed Action bundle
         run: git diff --exit-code -- dist
   workflow-lint:

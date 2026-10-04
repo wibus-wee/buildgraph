@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Buildgraph · 构建中心</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./">◈ Buildgraph</a>
+      <nav>
+        <a href="#projects">Workflows</a><a href="#connect">接入项目</a
+        ><a id="docs" href="https://github.com/wibus-wee/buildgraph#readme">文档 ↗</a>
+      </nav>
+    </header>
+    <main>
+      <section class="intro">
+        <p class="eyebrow">ONE HUB. INDEPENDENT PROJECTS.</p>
+        <h1>源码各自私有。<br />构建、分发，在这里连接。</h1>
+        <p>一个公开构建中心，连接不同项目与不同组织。<br />每个项目拥有自己的版本、产物和发布目的地。</p>
+        <a class="button primary" href="#connect">＋ 接入一个项目</a>
+      </section>
+      <section id="projects">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">YOUR WORKFLOWS</p>
+            <h2>从工作流开始</h2>
+          </div>
+          <a id="all-runs" href="#">查看全部运行 ↗</a>
+        </div>
+        <p id="catalog-status" role="status">正在读取工作流…</p>
+        <div id="catalog" class="catalog"></div>
+      </section>
+      <section id="connect">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">CONNECT A PROJECT</p>
+            <h2>添加项目，留下可审阅的 YAML。</h2>
+          </div>
+          <span class="badge">原生 GitHub Actions</span>
+        </div>
+        <div class="workspace">
+          <form id="wizard">
+            <fieldset>
+              <legend>01 / 项目与源码</legend>
+              <label
+                >构建中心<input
+                  name="hub"
+                  id="hub"
+                  required
+                  placeholder="your-org/buildgraph"
+                  autocomplete="off"
+              /></label>
+              <div class="two">
+                <label
+                  >项目 ID<input
+                    name="project"
+                    value="photo"
+                    required
+                    pattern="[a-z][a-z0-9_-]{0,39}" /></label
+                ><label
+                  >工具链<select name="stack">
+                    <option value="node">Node.js 24</option>
+                    <option value="go">Go / go.mod</option>
+                    <option value="custom">自定义 runner 命令</option>
+                  </select></label
+                >
+              </div>
+              <label
+                >私有源码仓库<input
+                  name="source"
+                  required
+                  placeholder="your-org/private-photo"
+                  autocomplete="off"
+              /></label>
+            </fieldset>
+            <fieldset>
+              <legend>02 / 构建</legend>
+              <label
+                >构建命令 <span>在 source/ 中执行</span
+                ><textarea name="command" rows="3" spellcheck="false">
+npm ci
+npm run build</textarea
+                ></label
+              ><label>输出目录<input name="output" value="source/dist" required /></label>
+            </fieldset>
+            <fieldset>
+              <legend>03 / 分发</legend>
+              <label
+                >构建完成后<select name="mode">
+                  <option value="artifact">保留加密产物</option>
+                  <option value="release">发布到指定仓库的 Releases</option>
+                  <option value="dispatch">触发指定仓库的 publish.yml</option>
+                </select></label
+              ><label id="destinations-label" hidden
+                >分发仓库 <span>每行一个，可以跨组织</span
+                ><textarea
+                  name="destinations"
+                  rows="3"
+                  placeholder="org-a/photo-distribution&#10;org-b/photo-mirror"
+                ></textarea>
+              </label>
+              <p id="mode-note">默认加密保存。项目之间不会自动建立依赖。</p>
+            </fieldset>
+            <button type="submit" class="primary">预览 workflow →</button>
+            <p id="error" role="alert"></p>
+          </form>
+          <aside class="preview">
+            <div class="preview-bar">
+              <span id="filename">.github/workflows/project-photo.yml</span><span>YAML</span>
+            </div>
+            <pre id="yaml" role="region" tabindex="0" aria-label="工作流 YAML 预览">
+填写源码仓库，预览你的第一个 workflow。</pre
+            >
+            <div class="preview-footer">
+              <p id="credentials">这里只填写配置，不填写 token 或密钥。</p>
+              <div class="actions">
+                <button id="copy" disabled>复制 YAML</button><button id="download" disabled>下载文件</button
+                ><a id="github-edit" class="button" hidden target="_blank" rel="noopener"
+                  >在 GitHub 新建 ↗</a
+                >
+              </div>
+              <p id="next-step">审阅 YAML → 提交到默认分支 → 在 Actions 选择 build 或 deliver。</p>
+              <p id="feedback" role="status"></p>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <section class="handoff">
+        <h2>从分发仓库发起，也能回到分发仓库。</h2>
+        <p>
+          使用 request-build.yml 请求中央构建，完成后由 publish.yml 接收产物。两边都是 workflow_dispatch。
+        </p>
+        <a
+          id="distribution-docs"
+          href="https://github.com/wibus-wee/buildgraph/blob/main/docs/distribution.md"
+          >配置双向触发与跨组织授权 ↗</a
+        >
+      </section>
+    </main>
+    <footer>
+      Buildgraph · 配置保存在你的 workflow 中。页面不会保存表单，也不会执行构建。<a
+        id="source-link"
+        href="https://github.com/wibus-wee/buildgraph"
+        >GitHub ↗</a
+      >
+    </footer>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

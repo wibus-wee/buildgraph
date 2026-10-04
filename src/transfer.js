@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pack, unpack } from './artifacts.js';
+import { githubApi, positiveId, repositoryPath } from './github.js';
 
 function contextFor(env, name) {
   for (const field of ['GITHUB_REPOSITORY', 'GITHUB_RUN_ID', 'GITHUB_SHA']) {
@@ -34,22 +35,39 @@ export async function upload({ client, directory, visibility = 'encrypted', key,
   }
 }
 
-/** Downloads one immutable ID from this run, checks its digest, then restores an absent destination. */
-export async function download({ client, artifactId, directory, visibility = 'encrypted', key, env = process.env, tempRoot = tmpdir() }) {
+/** Cross-run consumers pin a trusted workflow and branch, then authenticate with producer metadata. */
+async function remoteArtifact({ repository, runId, workflow, branch, token, api = githubApi(token) }, id) {
+  const base = repositoryPath(repository);
+  positiveId(runId, 'source-run-id');
+  if (!/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/.test(workflow ?? '')) throw new Error('source-workflow must be .github/workflows/<filename>.yml');
+  if (!branch || typeof branch !== 'string') throw new Error('source-branch must be a trusted branch name');
+  const run = await api(`${base}/actions/runs/${runId}`);
+  if (run.id !== Number(runId) || run.path !== workflow || run.head_branch !== branch || run.event !== 'workflow_dispatch' || !/^[a-f0-9]{40}$/.test(run.head_sha ?? '') || run.head_repository?.full_name?.toLowerCase() !== repository.toLowerCase()) {
+    throw new Error('Source run does not match the trusted repository, workflow, branch, and workflow_dispatch event');
+  }
+  const artifact = await api(`${base}/actions/artifacts/${id}`);
+  if (artifact.id !== id || artifact.expired || artifact.workflow_run?.id !== Number(runId) || artifact.workflow_run?.head_sha !== run.head_sha) throw new Error('Artifact does not belong to the source run or has expired');
+  const [repositoryOwner, repositoryName] = repository.split('/');
+  return { artifact, env: { GITHUB_REPOSITORY: run.head_repository.full_name, GITHUB_RUN_ID: String(run.id), GITHUB_SHA: run.head_sha }, findBy: { repositoryOwner, repositoryName, workflowRunId: Number(runId), token } };
+}
+
+/** Downloads one immutable ID, checks its digest, then restores an absent destination. */
+export async function download({ client, artifactId, directory, visibility = 'encrypted', key, source, expectedDigest, env = process.env, tempRoot = tmpdir() }) {
   checkOptions(visibility, key);
   if (!/^[1-9][0-9]*$/.test(String(artifactId)) || !Number.isSafeInteger(Number(artifactId))) throw new Error('artifact-id must be one positive integer; pass the upstream job output');
   const id = Number(artifactId);
-  const { artifacts } = await client.listArtifacts();
-  const artifact = artifacts.find(item => item.id === id);
+  const remote = source ? await remoteArtifact(source, id) : undefined;
+  const artifact = remote?.artifact ?? (await client.listArtifacts()).artifacts.find(item => item.id === id);
   if (!artifact) throw new Error(`Artifact ${id} was not found in this run; rebuild its producer if it expired`);
-  const context = contextFor(env, artifact.name);
+  const context = contextFor(remote?.env ?? env, artifact.name);
   const digest = artifact.digest?.replace(/^sha256:/, '');
   if (!/^[a-fA-F0-9]{64}$/.test(digest ?? '')) throw new Error(`Artifact ${id} has no valid SHA-256 digest`);
+  if (expectedDigest && expectedDigest.replace(/^sha256:/, '').toLowerCase() !== digest.toLowerCase()) throw new Error('Artifact digest does not match expected-digest');
   // Artifact SDK 6 compares the algorithm-prefixed digest, not the bare upload hash.
   const expectedHash = `sha256:${digest.toLowerCase()}`;
   const scratch = await mkdtemp(join(tempRoot, 'buildgraph-download-'));
   try {
-    const result = await client.downloadArtifact(id, { path: scratch, expectedHash });
+    const result = await client.downloadArtifact(id, { path: scratch, expectedHash, ...(remote ? { findBy: remote.findBy } : {}) });
     if (result.digestMismatch !== false) throw new Error(`Artifact ${id} digest verification failed`);
     const archive = join(scratch, visibility === 'encrypted' ? 'output.bgenc' : 'output.tar.gz');
     return await unpack({ archive, directory, visibility, key, context, tempRoot });

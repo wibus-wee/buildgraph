@@ -1,0 +1,38 @@
+name: Handoff test
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: hub
+          persist-credentials: false
+      - name: Create synthetic private output
+        run: |
+          mkdir output
+          printf '%s' 'buildgraph encrypted handoff fixture' > output/result.txt
+      - uses: ./hub/upload
+        id: upload
+        with:
+          path: output
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+      - uses: ./hub/dispatch
+        with:
+          repository: ${{ github.repository }}
+          workflow: handoff-receive.yml
+          ref: main
+          token: ${{ github.token }}
+          wait: 'true'
+          timeout-seconds: '480'
+          inputs: |
+            source_run_id: ${{ toJSON(github.run_id) }}
+            artifact_id: ${{ toJSON(steps.upload.outputs.artifact-id) }}
+            artifact_digest: ${{ toJSON(steps.upload.outputs.artifact-digest) }}
