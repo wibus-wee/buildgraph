@@ -42,7 +42,9 @@ actionlint -shellcheck='' .github/workflows/*.yml examples/*.yml
 
 加密或传输行为变更需要覆盖认证失败、错误输入、临时目录清理和真实传递。图文修改检查链接、场景可编辑性和 PNG 阅读效果，不需要为了文案重复触发带私有源码凭证的构建。
 
-修改 Pages 时运行 `npm run build:site`，用静态服务器预览 `_site/`，检查三种分发模式、YAML 下载、GitHub 编辑入口和窄屏布局。跨运行传输改动使用 handoff-test.yml 验证完整 round trip；它只消费合成测试内容，不发布 Release。跨组织 installation 权限仍需在实际组织验证，不能从同仓库测试推断通过。
+修改 Pages 时先读 [界面维护说明](../site/README.md)，运行 `npm run build:site` 和 `node --test test/site.test.js`，用静态服务器预览 `_site/`。检查原生拓扑、筛选与键盘导航，以及四步接入流程的三种分发模式、返回编辑、YAML 下载和 GitHub 编辑入口；在深浅主题与窄屏检查布局，同时验证 catalog 加载失败和公开 API 不可用时的恢复入口。不要把展示目录变成项目配置来源。
+
+跨运行传输改动使用 handoff-test.yml 验证完整 round trip；它只消费合成测试内容，不发布 Release。跨组织 installation 权限仍需在实际组织验证，不能从同仓库测试推断通过。
 
 提交前审阅 diff，尤其是新增的 checkout 仓库、上传目录、`visibility: public`、权限、environment 和 Release 命令。按任务授权提交、推送与 dispatch；验证构建优先选择只构建的目标，不把 `publish` 当成通用测试目标。
 

@@ -4,7 +4,7 @@
 
 一个网站、一个备份工具、一个照片应用，可以没有任何产品关系，也可以用完全不同的语言和版本号。它们的源码各自闭源，只共用这个公开的构建中心：统一放 workflows、可复用的配置，以及各项目自己的产物。产物可留在中央仓库，也可分发到不同组织自己的 distribution repo。
 
-[打开接入向导](https://wibus-wee.github.io/buildgraph/) · [跨组织分发与双向触发](./docs/distribution.md)
+[打开构建工作区](https://wibus-wee.github.io/buildgraph/) · [跨组织分发与双向触发](./docs/distribution.md)
 
 [![Buildgraph：私有源码经各 job checkout 进入中央公开仓库的构建链；Agent 修改同一份 YAML，经校验和审阅后触发运行。](./docs/diagrams/buildgraph.png)](./docs/diagrams/buildgraph.png)
 
@@ -38,7 +38,7 @@ gh workflow run build.yml -f target=independent
 
 ## 换成你的私有项目
 
-可以先用 [Pages 接入向导](https://wibus-wee.github.io/buildgraph/) 填写构建中心、源码仓库、命令和输出目录，预览后把 YAML 加入你的仓库。选择“保留加密产物”即可从独立项目开始；需要跨组织分发时再选择 Release 或远端 publish.yml。页面只准备普通 YAML，后续你和 Agent 直接编辑这个文件。
+在 [Pages 工作区](https://wibus-wee.github.io/buildgraph/) 查看现有工作流拓扑与运行记录，点击 **New project** 开始接入。按 Source → Build → Distribution → Review 填写构建中心、源码仓库、命令和输出目录，检查后把 YAML 加入你的仓库。选择 Encrypted artifact 即可从独立项目开始；需要跨组织分发时再选择 GitHub Release 或 Remote workflow。页面只准备普通 YAML，后续你和 Agent 直接编辑这个文件。
 
 从 [independent-projects.yml](./examples/independent-projects.yml) 开始：一个 Node.js 网站 `site`，一个 Go 备份工具 `backup`。两个 job 都只依赖 planner，不依赖彼此，也不互相下载产物。
 

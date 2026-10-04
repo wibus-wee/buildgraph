@@ -75,11 +75,13 @@ download 的当前运行模式不变。跨运行需同时传入 source-repositor
 
 [handoff-test.yml](../.github/workflows/handoff-test.yml) 用合成内容验证加密上传、dispatch、跨运行下载和等待，不创建 Release。接收端固定信任该 workflow 的 main 分支。同仓库测试不能代替各组织 App installation 的权限验证。
 
-## Pages 接入向导
+## Pages 工作区
 
-[Pages](https://wibus-wee.github.io/buildgraph/) 显示可手动触发的 workflows、公开运行状态和 GitHub 入口。表单生成一个独立 workflow 初稿，可复制、下载或跳转 GitHub 新建文件；用户在 GitHub 提交或发起 PR，审阅后加入默认分支。页面不接收 token、不自动提交、不直接 dispatch，也不保存表单配置。
+[Pages](https://wibus-wee.github.io/buildgraph/) 的 Overview 展示所选 workflow 的原生 jobs/needs 拓扑，点击节点查看 runner、步骤和直接依赖。Workflows 支持按名称、文件名和 target 筛选；Run history 读取公开 API 最近 30 次运行。拓扑表示声明的依赖，不表示本次执行状态，也不会把不同 workflow 或独立项目连成一个产品。
 
-源码在 [site/](../site/)，`npm run build:site` 输出 `_site/`。catalog.json 是从实际 workflows 派生的展示数据，不是需要维护的配置。向导不会覆写已有 workflow；后续直接修改 YAML。
+点击 New project，依次填写 Source、Build、Distribution，在 Review 检查 YAML 和需要配置的 secret/variable 名称。可复制、下载或跳转 GitHub 新建文件；用户在 GitHub 提交或发起 PR，审阅后加入默认分支。返回前一步保留输入，刷新会丢弃草稿。页面不接收 token、不自动提交、不直接 dispatch；仅保存主题偏好。
+
+源码与界面维护说明在 [site/](../site/)，`npm run build:site` 输出 `_site/`。catalog.json 是从实际 workflows 派生的展示数据，不是需要维护的配置。向导不会覆写已有 workflow；后续直接修改 YAML。页面显示的是当前站点所属构建仓库的工作流；表单填写其他 build repo 不会切换该目录。
 
 Fork 后在 Settings → Pages 将 Source 设为 GitHub Actions，再运行 Pages workflow。默认监听 main；若使用其他默认分支，同时修改 pages.yml 的 push 分支，并为站点构建设置 SITE_BRANCH。公开 API 限流或不可用时，仍可通过 GitHub 链接查看状态并使用 YAML 向导。
 

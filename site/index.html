@@ -1,152 +1,530 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light" />
-    <title>Buildgraph · 构建中心</title>
+    <meta name="theme-color" content="#101012" />
+    <meta
+      name="description"
+      content="Your workspace for independent builds. Explore workflows, inspect dependencies, and connect private projects to GitHub Actions."
+    />
+    <title>Overview · Buildgraph</title>
+    <link rel="preload" href="./fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="./style.css" />
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem('buildgraph-theme') === 'light' ? 'light' : 'dark';
+      } catch {}
+    </script>
   </head>
   <body>
-    <header>
-      <a class="brand" href="./">◈ Buildgraph</a>
-      <nav>
-        <a href="#projects">Workflows</a><a href="#connect">接入项目</a
-        ><a id="docs" href="https://github.com/wibus-wee/buildgraph#readme">文档 ↗</a>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div id="icons" hidden></div>
+    <aside class="sidebar" aria-label="Workspace navigation">
+      <a class="brand" href="#overview"><span data-icon="brand"></span><span>Buildgraph</span></a>
+      <a id="workspace-link" class="workspace-identity" href="https://github.com/wibus-wee/buildgraph"
+        ><span id="workspace-avatar" class="avatar">B</span
+        ><span
+          ><strong id="workspace-owner">Workspace</strong><small id="workspace-repo">buildgraph</small></span
+        ><span data-icon="external"></span
+      ></a>
+      <button class="search-launch" data-command>
+        <span data-icon="search"></span><span>Search anything…</span><kbd class="command-key">⌘ K</kbd>
+      </button>
+      <p class="nav-label">Workspace</p>
+      <nav class="main-nav" aria-label="Main">
+        <a href="#overview" data-nav="overview"><span data-icon="overview"></span>Overview</a>
+        <a href="#workflows" data-nav="workflows"
+          ><span data-icon="workflow"></span>Workflows <span id="nav-count" class="nav-count">…</span></a
+        >
+        <a href="#runs" data-nav="runs"><span data-icon="clock"></span>Run history</a>
       </nav>
-    </header>
-    <main>
-      <section class="intro">
-        <p class="eyebrow">ONE HUB. INDEPENDENT PROJECTS.</p>
-        <h1>源码各自私有。<br />构建、分发，在这里连接。</h1>
-        <p>一个公开构建中心，连接不同项目与不同组织。<br />每个项目拥有自己的版本、产物和发布目的地。</p>
-        <a class="button primary" href="#connect">＋ 接入一个项目</a>
-      </section>
-      <section id="projects">
-        <div class="section-title">
-          <div>
-            <p class="eyebrow">YOUR WORKFLOWS</p>
-            <h2>从工作流开始</h2>
-          </div>
-          <a id="all-runs" href="#">查看全部运行 ↗</a>
+      <a class="new-project-nav" href="#new" data-nav="new"><span data-icon="plus"></span>New project</a>
+      <div class="sidebar-bottom">
+        <p class="nav-label">Resources</p>
+        <a data-doc="README.md" href="https://github.com/wibus-wee/buildgraph#readme"
+          ><span data-icon="book"></span>Documentation<span data-icon="external"></span
+        ></a>
+        <a
+          data-doc="docs/distribution.md"
+          href="https://github.com/wibus-wee/buildgraph/blob/main/docs/distribution.md"
+          ><span data-icon="branch"></span>Distribution guide<span data-icon="external"></span
+        ></a>
+        <div class="sidebar-foot">
+          <span class="tiny-brand">Built on GitHub Actions</span
+          ><button
+            id="theme-toggle"
+            class="icon-button"
+            aria-label="Switch to light theme"
+            title="Switch theme"
+          >
+            <span data-icon="sun"></span>
+          </button>
         </div>
-        <p id="catalog-status" role="status">正在读取工作流…</p>
-        <div id="catalog" class="catalog"></div>
-      </section>
-      <section id="connect">
-        <div class="section-title">
-          <div>
-            <p class="eyebrow">CONNECT A PROJECT</p>
-            <h2>添加项目，留下可审阅的 YAML。</h2>
-          </div>
-          <span class="badge">原生 GitHub Actions</span>
+      </div>
+    </aside>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="breadcrumbs">
+          <button id="mobile-menu" class="icon-button" aria-label="Open navigation">
+            <span data-icon="menu"></span></button
+          ><span id="breadcrumb-repo">buildgraph</span><span class="slash">/</span
+          ><span id="breadcrumb-page">Overview</span>
         </div>
-        <div class="workspace">
-          <form id="wizard">
-            <fieldset>
-              <legend>01 / 项目与源码</legend>
-              <label
-                >构建中心<input
-                  name="hub"
-                  id="hub"
-                  required
-                  placeholder="your-org/buildgraph"
-                  autocomplete="off"
-              /></label>
-              <div class="two">
-                <label
-                  >项目 ID<input
-                    name="project"
-                    value="photo"
-                    required
-                    pattern="[a-z][a-z0-9_-]{0,39}" /></label
-                ><label
-                  >工具链<select name="stack">
-                    <option value="node">Node.js 24</option>
-                    <option value="go">Go / go.mod</option>
-                    <option value="custom">自定义 runner 命令</option>
-                  </select></label
-                >
+        <div class="topbar-actions">
+          <span class="public-label"><span data-icon="globe"></span>Public workspace</span
+          ><a
+            id="github-link"
+            class="icon-button"
+            href="https://github.com/wibus-wee/buildgraph"
+            aria-label="Open repository on GitHub"
+            ><span data-icon="github"></span
+          ></a>
+        </div>
+      </header>
+      <main id="main" tabindex="-1">
+        <section id="workspace-view" class="page-view">
+          <div class="page-heading">
+            <div>
+              <h1 id="page-title">Build workspace</h1>
+              <p id="page-description">Independent projects. One place to build and distribute.</p>
+            </div>
+            <a class="button primary" href="#new"><span data-icon="plus"></span>New project</a>
+          </div>
+          <div id="workspace-meta" class="workspace-meta">
+            <span><span data-icon="workflow"></span><strong id="workflow-count">…</strong> workflows</span
+            ><span><span data-icon="box"></span><strong id="target-count">…</strong> selectable targets</span
+            ><span class="meta-branch"
+              ><span data-icon="branch"></span><span id="branch-name" class="mono">main</span></span
+            ><a id="edit-workflows" href="https://github.com/wibus-wee/buildgraph/tree/main/.github/workflows"
+              >Browse source<span data-icon="external"></span
+            ></a>
+          </div>
+          <div id="catalog-error" class="notice" hidden>
+            <span data-icon="info"></span>
+            <p>Couldn’t load the workflow catalog. You can still create a project.</p>
+            <button id="retry-catalog" class="button small">Try again</button>
+          </div>
+          <div class="workspace-body">
+            <section id="graph-panel" class="graph-panel" aria-labelledby="graph-title">
+              <div class="graph-toolbar">
+                <div class="graph-heading">
+                  <span data-icon="branch"></span>
+                  <h2 id="graph-title">Workflow topology</h2>
+                  <span class="separator">/</span
+                  ><label class="sr-only" for="graph-workflow">Inspect workflow</label
+                  ><select id="graph-workflow" class="quiet-select" disabled>
+                    <option>Loading…</option>
+                  </select>
+                </div>
+                <a id="graph-run" class="button small" href="https://github.com/wibus-wee/buildgraph/actions"
+                  ><span data-icon="play"></span>Run on GitHub<span data-icon="external"></span
+                ></a>
               </div>
-              <label
-                >私有源码仓库<input
-                  name="source"
-                  required
-                  placeholder="your-org/private-photo"
-                  autocomplete="off"
-              /></label>
-            </fieldset>
-            <fieldset>
-              <legend>02 / 构建</legend>
-              <label
-                >构建命令 <span>在 source/ 中执行</span
-                ><textarea name="command" rows="3" spellcheck="false">
+              <div class="graph-subbar">
+                <span id="graph-file" class="mono muted">.github/workflows/</span
+                ><span class="graph-declaration"><span class="legend-line"></span>Declared dependency</span>
+              </div>
+              <div
+                id="graph-viewport"
+                class="graph-viewport"
+                role="region"
+                aria-label="Workflow dependency graph"
+                tabindex="0"
+              >
+                <div class="graph-loading">Loading workflow topology…</div>
+              </div>
+              <div id="job-inspector" class="job-inspector" hidden></div>
+              <div class="graph-bottom">
+                <span
+                  ><span data-icon="info"></span>Inspect a job to see its runner, steps, and
+                  dependencies.</span
+                ><a id="graph-source" href="https://github.com/wibus-wee/buildgraph"
+                  >View YAML<span data-icon="code"></span
+                ></a>
+              </div>
+            </section>
+            <section class="workflow-section" aria-labelledby="workflows-title">
+              <div class="list-heading">
+                <h2 id="workflows-title">Workflows <span id="list-count" class="count">…</span></h2>
+                <div class="list-tools">
+                  <label class="search-input"
+                    ><span data-icon="search"></span
+                    ><input
+                      id="workflow-search"
+                      name="workflow-search"
+                      type="search"
+                      autocomplete="off"
+                      placeholder="Find a workflow…"
+                      aria-label="Filter workflows"
+                    /><kbd>/</kbd></label
+                  >
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="workflow-table">
+                  <caption class="sr-only">
+                    Workflow definitions and most recent available runs
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Workflow</th>
+                      <th scope="col">Targets</th>
+                      <th scope="col">Latest run</th>
+                      <th scope="col" class="align-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="workflow-list">
+                    <tr>
+                      <td colspan="4" class="loading-cell">Loading workflows…</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p id="filter-status" class="sr-only" aria-live="polite"></p>
+            </section>
+          </div>
+          <div class="connect-strip">
+            <div class="connect-mark" aria-hidden="true"><span data-icon="branch"></span></div>
+            <div>
+              <h2>A new project starts with one workflow.</h2>
+              <p>Connect a private repository and choose where its build goes.</p>
+            </div>
+            <a class="text-link" href="#new">Connect a project<span data-icon="arrow-right"></span></a>
+          </div>
+        </section>
+        <section id="runs-view" class="page-view" hidden>
+          <div class="page-heading">
+            <div>
+              <h1>Run history</h1>
+              <p>Recent activity across this build workspace.</p>
+            </div>
+            <button id="refresh-runs" class="button"><span data-icon="refresh"></span>Refresh</button>
+          </div>
+          <div id="run-history"></div>
+          <a id="all-runs" class="text-link" href="https://github.com/wibus-wee/buildgraph/actions"
+            >All runs on GitHub<span data-icon="external"></span
+          ></a>
+        </section>
+        <section id="new-view" class="page-view" hidden>
+          <div class="page-heading">
+            <div>
+              <a class="back-link" href="#overview"><span data-icon="arrow-left"></span>Back to workspace</a>
+              <h1>Connect a project</h1>
+              <p>Your source stays private. You choose what gets published.</p>
+            </div>
+            <span class="draft-label"><span data-icon="file"></span>New workflow</span>
+          </div>
+          <nav aria-label="Project setup steps" class="setup-steps">
+            <ol>
+              <li>
+                <a href="#new?step=source" data-step-link="0"><span>1</span>Source</a>
+              </li>
+              <li>
+                <a href="#new?step=build" data-step-link="1"><span>2</span>Build</a>
+              </li>
+              <li>
+                <a href="#new?step=distribution" data-step-link="2"><span>3</span>Distribution</a>
+              </li>
+              <li>
+                <a href="#new?step=review" data-step-link="3"><span>4</span>Review</a>
+              </li>
+            </ol>
+          </nav>
+          <div id="setup-layout" class="setup-layout">
+            <form id="wizard" novalidate>
+              <fieldset data-stage="0">
+                <legend>Where does your code live?</legend>
+                <p class="step-description">Start an independent project in your build workspace.</p>
+                <div class="field">
+                  <label for="hub">Build repository</label
+                  ><input
+                    id="hub"
+                    name="hub"
+                    required
+                    placeholder="your-org/buildgraph"
+                    autocomplete="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    aria-describedby="hub-help hub-error"
+                  />
+                  <p id="hub-help" class="field-help">The public repository that runs your workflows.</p>
+                  <p id="hub-error" class="field-error" hidden></p>
+                </div>
+                <div class="field">
+                  <label for="source">Source repository<span data-icon="lock"></span></label
+                  ><input
+                    id="source"
+                    name="source"
+                    required
+                    placeholder="your-org/private-project"
+                    autocomplete="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    aria-describedby="source-error"
+                  />
+                  <p id="source-error" class="field-error" hidden></p>
+                </div>
+                <div class="field">
+                  <label for="project">Project ID</label
+                  ><input
+                    id="project"
+                    name="project"
+                    required
+                    placeholder="photo-app"
+                    autocomplete="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    aria-describedby="project-help project-error"
+                  />
+                  <p id="project-help" class="field-help">
+                    Used in the workflow filename. Lowercase letters, numbers, hyphens, or underscores.
+                  </p>
+                  <p id="project-error" class="field-error" hidden></p>
+                </div>
+              </fieldset>
+              <fieldset data-stage="1" hidden>
+                <legend>Define the build.</legend>
+                <p class="step-description">Commands run in the checked-out source repository.</p>
+                <div class="field">
+                  <label for="stack">Toolchain</label
+                  ><select id="stack" name="stack">
+                    <option value="node">Node.js 24</option>
+                    <option value="go">Go · version from go.mod</option>
+                    <option value="custom">Custom commands</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="command">Build commands<span class="field-context mono">source/</span></label
+                  ><textarea
+                    id="command"
+                    name="command"
+                    rows="5"
+                    spellcheck="false"
+                    aria-describedby="command-error"
+                  >
 npm ci
 npm run build</textarea
-                ></label
-              ><label>输出目录<input name="output" value="source/dist" required /></label>
-            </fieldset>
-            <fieldset>
-              <legend>03 / 分发</legend>
-              <label
-                >构建完成后<select name="mode">
-                  <option value="artifact">保留加密产物</option>
-                  <option value="release">发布到指定仓库的 Releases</option>
-                  <option value="dispatch">触发指定仓库的 publish.yml</option>
-                </select></label
-              ><label id="destinations-label" hidden
-                >分发仓库 <span>每行一个，可以跨组织</span
-                ><textarea
-                  name="destinations"
-                  rows="3"
-                  placeholder="org-a/photo-distribution&#10;org-b/photo-mirror"
-                ></textarea>
-              </label>
-              <p id="mode-note">默认加密保存。项目之间不会自动建立依赖。</p>
-            </fieldset>
-            <button type="submit" class="primary">预览 workflow →</button>
-            <p id="error" role="alert"></p>
-          </form>
-          <aside class="preview">
-            <div class="preview-bar">
-              <span id="filename">.github/workflows/project-photo.yml</span><span>YAML</span>
-            </div>
-            <pre id="yaml" role="region" tabindex="0" aria-label="工作流 YAML 预览">
-填写源码仓库，预览你的第一个 workflow。</pre
-            >
-            <div class="preview-footer">
-              <p id="credentials">这里只填写配置，不填写 token 或密钥。</p>
-              <div class="actions">
-                <button id="copy" disabled>复制 YAML</button><button id="download" disabled>下载文件</button
-                ><a id="github-edit" class="button" hidden target="_blank" rel="noopener"
-                  >在 GitHub 新建 ↗</a
-                >
+                  >
+                  <p id="command-error" class="field-error" hidden></p>
+                </div>
+                <div class="field">
+                  <label for="output">Output directory</label
+                  ><input
+                    id="output"
+                    name="output"
+                    value="source/dist"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="output-help output-error"
+                  />
+                  <p id="output-help" class="field-help">
+                    Only this directory is uploaded. Use a path inside source/.
+                  </p>
+                  <p id="output-error" class="field-error" hidden></p>
+                </div>
+              </fieldset>
+              <fieldset data-stage="2" hidden>
+                <legend>Choose a destination.</legend>
+                <p class="step-description">Keep builds in the hub or distribute across organizations.</p>
+                <div class="delivery-options">
+                  <label class="delivery-option"
+                    ><input type="radio" name="mode" value="artifact" checked /><span data-icon="lock"></span
+                    ><span
+                      ><strong>Encrypted artifact</strong
+                      ><small>Keep the output in your build repository.</small></span
+                    ></label
+                  ><label class="delivery-option"
+                    ><input type="radio" name="mode" value="release" /><span data-icon="box"></span
+                    ><span
+                      ><strong>GitHub Release</strong
+                      ><small>Publish directly to one or more repositories.</small></span
+                    ></label
+                  ><label class="delivery-option"
+                    ><input type="radio" name="mode" value="dispatch" /><span data-icon="branch"></span
+                    ><span
+                      ><strong>Remote workflow</strong
+                      ><small>Let each destination run its own publish.yml.</small></span
+                    ></label
+                  >
+                </div>
+                <div id="destination-field" class="field" hidden>
+                  <label for="destinations">Distribution repositories</label
+                  ><textarea
+                    id="destinations"
+                    name="destinations"
+                    rows="3"
+                    placeholder="org-a/photo-distribution&#10;org-b/photo-mirror"
+                    spellcheck="false"
+                    aria-describedby="destinations-help destinations-error"
+                  ></textarea>
+                  <p id="destinations-help" class="field-help">
+                    One owner/repository per line. Each organization authorizes its own GitHub App
+                    installation.
+                  </p>
+                  <p id="destinations-error" class="field-error" hidden></p>
+                </div>
+                <p id="delivery-note" class="inline-note">
+                  <span data-icon="info"></span
+                  ><span
+                    >Artifacts are encrypted before upload. Only holders of your key can restore them.</span
+                  >
+                </p>
+              </fieldset>
+              <div id="wizard-actions" class="wizard-actions">
+                <button type="button" id="step-back" class="button quiet">
+                  <span data-icon="arrow-left"></span>Back</button
+                ><button type="submit" id="step-next" class="button primary">
+                  Configure build<span data-icon="arrow-right"></span>
+                </button>
               </div>
-              <p id="next-step">审阅 YAML → 提交到默认分支 → 在 Actions 选择 build 或 deliver。</p>
-              <p id="feedback" role="status"></p>
+              <p id="wizard-error" class="field-error" role="alert"></p>
+            </form>
+            <aside id="draft-summary" class="draft-summary" aria-label="Project preview">
+              <div class="draft-header"><span data-icon="workflow"></span><span>Project preview</span></div>
+              <div class="draft-route">
+                <div class="route-stop">
+                  <span class="route-icon" data-icon="lock"></span>
+                  <div>
+                    <small>Source repository</small><strong id="preview-source">Your private source</strong>
+                  </div>
+                </div>
+                <div class="route-connector"><span>checkout</span></div>
+                <div class="route-stop">
+                  <span class="route-icon" data-icon="brand"></span>
+                  <div>
+                    <small>Build workspace</small><strong id="preview-hub">Your build repository</strong>
+                  </div>
+                </div>
+                <div class="route-connector"><span id="preview-action">encrypt & upload</span></div>
+                <div class="route-stop">
+                  <span class="route-icon" data-icon="box"></span>
+                  <div>
+                    <small id="preview-destination-label">Output</small
+                    ><strong id="preview-destination">Encrypted artifact</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="draft-footer">
+                <span data-icon="file"></span><code id="preview-file">project-name.yml</code>
+              </div>
+              <p class="draft-caption">
+                Independent by default. Add dependencies only when a project needs another project’s output.
+              </p>
+            </aside>
+          </div>
+          <section id="review-panel" class="review-panel" aria-labelledby="review-title" hidden>
+            <div class="review-heading">
+              <div>
+                <h2 id="review-title" tabindex="-1">Ready for your review.</h2>
+                <p>Commit this workflow to your build repository’s default branch.</p>
+              </div>
+              <button id="review-back" class="button quiet">
+                <span data-icon="arrow-left"></span>Edit configuration
+              </button>
             </div>
-          </aside>
-        </div>
-      </section>
-      <section class="handoff">
-        <h2>从分发仓库发起，也能回到分发仓库。</h2>
-        <p>
-          使用 request-build.yml 请求中央构建，完成后由 publish.yml 接收产物。两边都是 workflow_dispatch。
-        </p>
+            <div class="review-layout">
+              <div class="code-panel">
+                <div class="code-toolbar">
+                  <span><span data-icon="file"></span><span id="filename" class="mono"></span></span
+                  ><button id="copy" class="icon-button" aria-label="Copy YAML" title="Copy YAML">
+                    <span data-icon="copy"></span>
+                  </button>
+                </div>
+                <pre
+                  id="yaml"
+                  role="region"
+                  tabindex="0"
+                  aria-label="Generated workflow YAML"
+                  translate="no"
+                ></pre>
+                <div class="code-footer">
+                  <span>GitHub Actions YAML</span
+                  ><button id="download" class="text-button">
+                    <span data-icon="download"></span>Download file
+                  </button>
+                </div>
+              </div>
+              <aside class="review-next">
+                <h3>Before the first build</h3>
+                <p class="muted">Add these names in your build repository’s settings.</p>
+                <div id="credentials"></div>
+                <a id="secrets-link" class="text-link" href="https://github.com"
+                  >Repository settings<span data-icon="external"></span
+                ></a>
+                <div class="next-run">
+                  <h3>Start with a build</h3>
+                  <p id="review-run-help"></p>
+                </div>
+                <a id="github-edit" class="button primary" target="_blank" rel="noopener"
+                  ><span data-icon="github"></span>Open in GitHub<span data-icon="external"></span
+                ></a>
+                <p id="github-edit-help" class="field-help">
+                  Review the file, then submit a commit or pull request on GitHub.
+                </p>
+                <a id="receiver-guide" data-doc="docs/distribution.md" class="text-link" hidden
+                  >Set up the receiving workflow<span data-icon="arrow-right"></span
+                ></a>
+              </aside>
+            </div>
+          </section>
+        </section>
+        <footer class="page-footer">
+          <span id="activity-state"><span class="status-dot"></span>Loading GitHub activity…</span
+          ><span>Native workflows. Your infrastructure.</span>
+        </footer>
+      </main>
+    </div>
+    <dialog id="command-dialog" aria-labelledby="command-title">
+      <h2 id="command-title" class="sr-only">Search and navigate</h2>
+      <div class="command-search">
+        <span data-icon="search"></span
+        ><input
+          id="command-search"
+          type="search"
+          placeholder="Search workflows or jump to…"
+          aria-label="Search commands"
+          autocomplete="off"
+        /><button id="command-close" class="icon-button" aria-label="Close search"><kbd>Esc</kbd></button>
+      </div>
+      <div id="command-results" class="command-results"></div>
+      <div class="command-footer"><span>↑ ↓ Navigate</span><span>↵ Open</span></div>
+    </dialog>
+    <dialog id="mobile-dialog" aria-label="Workspace navigation">
+      <div class="mobile-nav-heading">
+        <strong>Buildgraph</strong
+        ><button id="mobile-close" class="icon-button" aria-label="Close navigation">
+          <span data-icon="close"></span>
+        </button>
+      </div>
+      <nav>
+        <a href="#overview" data-nav="overview">Overview</a
+        ><a href="#workflows" data-nav="workflows">Workflows</a><a href="#runs" data-nav="runs">Run history</a
+        ><a href="#new" data-nav="new">New project</a>
+      </nav>
+      <div class="mobile-resources">
+        <button class="button" data-command><span data-icon="search"></span>Search workspace</button>
+        <a data-doc="README.md" href="https://github.com/wibus-wee/buildgraph#readme"
+          >Documentation<span data-icon="external"></span
+        ></a>
         <a
-          id="distribution-docs"
+          data-doc="docs/distribution.md"
           href="https://github.com/wibus-wee/buildgraph/blob/main/docs/distribution.md"
-          >配置双向触发与跨组织授权 ↗</a
-        >
-      </section>
-    </main>
-    <footer>
-      Buildgraph · 配置保存在你的 workflow 中。页面不会保存表单，也不会执行构建。<a
-        id="source-link"
-        href="https://github.com/wibus-wee/buildgraph"
-        >GitHub ↗</a
-      >
-    </footer>
+          >Distribution guide<span data-icon="external"></span
+        ></a>
+        <button id="mobile-theme" class="button">
+          <span data-icon="sun"></span><span id="mobile-theme-label">Switch to light theme</span>
+        </button>
+      </div>
+    </dialog>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <noscript
+      ><p class="noscript">
+        Enable JavaScript to use this workspace, or
+        <a href="https://github.com/wibus-wee/buildgraph">open the repository on GitHub</a>.
+      </p></noscript
+    >
     <script type="module" src="./app.js"></script>
   </body>
 </html>
