@@ -109270,7 +109270,7 @@ var import_yaml2 = __toESM(require_dist(), 1);
 function dispatchInputs(source = "") {
   const doc = (0, import_yaml2.parseDocument)(source, { version: "1.2" });
   if (doc.errors.length) throw new Error("inputs must be valid YAML with unique keys");
-  const inputs = doc.toJS({ maxAliasCount: 20 }) ?? {};
+  const inputs = source.trim() === "" ? {} : doc.toJS({ maxAliasCount: 20 });
   if (!inputs || Array.isArray(inputs) || typeof inputs !== "object" || Object.keys(inputs).length > 25)
     throw new Error("inputs must be a YAML mapping of at most 25 scalar values");
   for (const [name, value] of Object.entries(inputs)) {

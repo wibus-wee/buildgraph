@@ -10,7 +10,7 @@ test('native YAML dispatch inputs preserve booleans and reject ambiguous or nest
     attempt: 2,
     ref: 'on',
   });
-  for (const source of ['a: 1\na: 2', '[a,b]', 'a: [1,2]', 'a: null', 'a: .inf', 'text'])
+  for (const source of ['a: 1\na: 2', '[a,b]', 'a: [1,2]', 'a: null', 'a: .inf', 'text', 'null'])
     assert.throws(() => dispatchInputs(source));
   assert.deepEqual(dispatchInputs(''), {});
 });
