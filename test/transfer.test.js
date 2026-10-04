@@ -18,7 +18,7 @@ async function fixture(t) {
       assert.equal(options.compressionLevel, 0);
       const bytes = await readFile(files[0]);
       const digest = createHash('sha256').update(bytes).digest('hex');
-      const item = { id: stored.length + 1, name, digest, bytes, file: basename(files[0]) };
+      const item = { id: stored.length + 1, name, digest: `sha256:${digest}`, bytes, file: basename(files[0]) };
       stored.push(item);
       return { id: item.id, digest };
     },
@@ -26,7 +26,8 @@ async function fixture(t) {
     async downloadArtifact(id, { path, expectedHash }) {
       const item = stored.find(item => item.id === id);
       await writeFile(join(path, item.file), item.bytes);
-      return { digestMismatch: createHash('sha256').update(item.bytes).digest('hex') !== expectedHash };
+      assert.match(expectedHash, /^sha256:[a-f0-9]{64}$/);
+      return { digestMismatch: `sha256:${createHash('sha256').update(item.bytes).digest('hex')}` !== expectedHash };
     },
   };
   return { client, directory, tempRoot: root, stored, key: randomBytes(32).toString('hex'), env: {

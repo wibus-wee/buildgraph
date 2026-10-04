@@ -43,8 +43,10 @@ export async function download({ client, artifactId, directory, visibility = 'en
   const artifact = artifacts.find(item => item.id === id);
   if (!artifact) throw new Error(`Artifact ${id} was not found in this run; rebuild its producer if it expired`);
   const context = contextFor(env, artifact.name);
-  const expectedHash = artifact.digest?.replace(/^sha256:/, '');
-  if (!/^[a-fA-F0-9]{64}$/.test(expectedHash ?? '')) throw new Error(`Artifact ${id} has no valid SHA-256 digest`);
+  const digest = artifact.digest?.replace(/^sha256:/, '');
+  if (!/^[a-fA-F0-9]{64}$/.test(digest ?? '')) throw new Error(`Artifact ${id} has no valid SHA-256 digest`);
+  // Artifact SDK 6 compares the algorithm-prefixed digest, not the bare upload hash.
+  const expectedHash = `sha256:${digest.toLowerCase()}`;
   const scratch = await mkdtemp(join(tempRoot, 'buildgraph-download-'));
   try {
     const result = await client.downloadArtifact(id, { path: scratch, expectedHash });

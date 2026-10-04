@@ -109201,8 +109201,9 @@ async function download({ client: client2, artifactId, directory, visibility = "
   const artifact = artifacts.find((item) => item.id === id);
   if (!artifact) throw new Error(`Artifact ${id} was not found in this run; rebuild its producer if it expired`);
   const context5 = contextFor(env, artifact.name);
-  const expectedHash = artifact.digest?.replace(/^sha256:/, "");
-  if (!/^[a-fA-F0-9]{64}$/.test(expectedHash ?? "")) throw new Error(`Artifact ${id} has no valid SHA-256 digest`);
+  const digest = artifact.digest?.replace(/^sha256:/, "");
+  if (!/^[a-fA-F0-9]{64}$/.test(digest ?? "")) throw new Error(`Artifact ${id} has no valid SHA-256 digest`);
+  const expectedHash = `sha256:${digest.toLowerCase()}`;
   const scratch = await (0, import_promises8.mkdtemp)((0, import_node_path11.join)(tempRoot, "buildgraph-download-"));
   try {
     const result = await client2.downloadArtifact(id, { path: scratch, expectedHash });
