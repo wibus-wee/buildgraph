@@ -22,7 +22,6 @@ env:
   CI: 'true'
   API_ORIGIN: ${{ vars.API_ORIGIN }}
   BUILDGRAPH_INPUTS: ${{ github.workspace }}/inputs
-  BUILDGRAPH_OUTPUT: ${{ github.workspace }}/output
 defaults:
   run:
     shell: bash
@@ -39,10 +38,9 @@ jobs:
         with:
           path: hub
           persist-credentials: false
-      - uses: ./hub
+      - uses: ./hub/plan
         id: graph
         with:
-          operation: plan
           workflow: hub/.github/workflows/private-projects.yml
           target: ${{ inputs.target }}
 
@@ -69,35 +67,17 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
-      - &prepare
-        uses: ./hub
-        with:
-          operation: prepare
-          directory: ${{ env.BUILDGRAPH_OUTPUT }}
-          inputs-directory: ${{ env.BUILDGRAPH_INPUTS }}
-          source-directory: ${{ github.workspace }}/source
       - name: Build core
         run: |
           npm ci
           npm run build
-          cp -R dist/. "$BUILDGRAPH_OUTPUT/"
-      - &pack
-        uses: ./hub
-        id: pack
-        with:
-          operation: pack
-          directory: ${{ env.BUILDGRAPH_OUTPUT }}
-          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-          context: ${{ github.run_id }}:${{ github.sha }}:${{ github.job }}
       - &upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        name: Upload encrypted output
+        uses: ./hub/upload
         id: upload
         with:
-          name: bg-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
-          path: ${{ steps.pack.outputs.archive }}
-          if-no-files-found: error
-          retention-days: 7
-          compression-level: 0
+          path: source/dist
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
 
   app:
     needs: [plan, core]
@@ -118,27 +98,17 @@ jobs:
           path: source
           persist-credentials: false
       - *setup_node
-      - *prepare
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: ./hub/download
         with:
-          artifact-ids: ${{ needs.core.outputs.artifact_id }}
-          path: transfer/core
-          digest-mismatch: error
-      - uses: ./hub
-        with:
-          operation: unpack
-          archive: transfer/core/output.bgenc
-          directory: ${{ env.BUILDGRAPH_INPUTS }}/core
+          artifact-id: ${{ needs.core.outputs.artifact_id }}
+          path: ${{ env.BUILDGRAPH_INPUTS }}/core
           key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-          context: ${{ github.run_id }}:${{ github.sha }}:core
       - name: Build app with core
         run: |
           mkdir -p vendor/core
           cp -R "$BUILDGRAPH_INPUTS/core/." vendor/core/
           npm ci
           npm run build
-          cp -R dist/. "$BUILDGRAPH_OUTPUT/"
-      - *pack
       - *upload
 
   publish:
@@ -154,18 +124,11 @@ jobs:
       contents: write
     steps:
       - *checkout_hub
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: ./hub/download
         with:
-          artifact-ids: ${{ needs.app.outputs.artifact_id }}
-          path: transfer/app
-          digest-mismatch: error
-      - uses: ./hub
-        with:
-          operation: unpack
-          archive: transfer/app/output.bgenc
-          directory: ${{ env.BUILDGRAPH_INPUTS }}/app
+          artifact-id: ${{ needs.app.outputs.artifact_id }}
+          path: ${{ env.BUILDGRAPH_INPUTS }}/app
           key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-          context: ${{ github.run_id }}:${{ github.sha }}:app
       - name: Publish to the central repository
         env:
           GH_TOKEN: ${{ github.token }}

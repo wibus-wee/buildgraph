@@ -1,0 +1,6 @@
+buffers 0.1.1
+Author: James Halliday (http://substack.net)
+Repository: http://github.com/substack/node-buffers.git
+Source: npm package metadata for buffers 0.1.1
+
+This package ships without a separate license file or license declaration.

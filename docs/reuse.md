@@ -3,7 +3,7 @@
 | 方式 | 适用情况 |
 | --- | --- |
 | Fork 本仓库 | 直接编辑现成工作流，把它作为公开构建中心 |
-| `uses: wibus-wee/buildgraph@<SHA>` | 在已有原生 YAML 中使用目标选择和产物封装 |
+| `uses: wibus-wee/buildgraph/{plan,upload,download}@<SHA>` | 在已有原生 YAML 中选择对应 Action 入口 |
 | CLI / JS 库 | 本地查看依赖闭包，或在其他工具中读取工作流 |
 
 ## 在现有 workflow 中 uses
@@ -20,10 +20,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: wibus-wee/buildgraph@<SHA>
+      - uses: wibus-wee/buildgraph/plan@<SHA>
         id: graph
         with:
-          operation: plan
           workflow: .github/workflows/build.yml
           target: ${{ inputs.target }}
   app:
@@ -36,7 +35,7 @@ jobs:
 
 只需在顶部声明正常的 `on.workflow_dispatch.inputs.target`。添加项目时编辑 jobs，添加依赖时编辑 needs。无须安装 npm 包或运行生成命令。
 
-pack/unpack 也用同一个 Action，以 `operation` 区分。完整的 artifact 上传、下载和权限配置参考[工作流接入](./configuration.md#action-inputs)与[实际工作流](../.github/workflows/build.yml)。如果只需按原生 needs 运行全图，可以省略 planner，单独使用产物操作。
+上传使用 `wibus-wee/buildgraph/upload@<SHA>`，下载使用 `wibus-wee/buildgraph/download@<SHA>`。两者只需目录、key，以及下载时的上游 artifact ID。完整 inputs、job outputs 和权限配置参考[工作流接入](./configuration.md#action-inputs)与[实际工作流](../.github/workflows/build.yml)。如果只需按原生 needs 运行全图，可以省略 planner，单独使用产物操作。
 
 ## 本地 CLI
 
@@ -68,6 +67,7 @@ console.log(execution.selected);
 | `dependencies(workflow, id)` | 返回某个 job 的直接 needs 数组，支持原生 string / array 写法 |
 | `plan(workflow, options?)` | 返回 `{targets, selected}`；selected 为去重的拓扑序，不包含 planner |
 | `order(workflow)` | 返回全图拓扑序，包含 planner |
+| `diagnoseWiring(workflow, {plannerJob}?)` | 返回 `{level, job, message}[]`；检查标准选择条件，任意表达式不求值 |
 | `pack(options)` | 异步打包并返回临时 archive 路径，上传后调用方可清理父目录 |
 | `unpack(options)` | 异步验证并恢复到尚不存在的目录，返回目标路径；失败清理临时内容 |
 

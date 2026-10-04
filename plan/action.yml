@@ -1,0 +1,17 @@
+name: Buildgraph plan
+description: Select target jobs and their prerequisites from a native workflow
+inputs:
+  workflow:
+    description: Path to the checked-out workflow YAML
+    required: true
+  target:
+    description: Comma-separated job IDs; defaults to the workflow dispatch target default
+  planner-job:
+    description: ID of the planner job
+    default: plan
+outputs:
+  selected:
+    description: JSON array of selected job IDs for fromJSON in job conditions
+runs:
+  using: node24
+  main: index.cjs

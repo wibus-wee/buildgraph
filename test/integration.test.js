@@ -25,7 +25,7 @@ test('real demo build scripts consume restored upstream outputs across a diamond
       await unpack({ archive: archives.get(dep), directory: join(inputs, dep), key, context: dep, tempRoot: root });
     }
     await exec(process.execPath, [resolve('examples/demo/build.mjs'), id], { env: { ...process.env, BUILDGRAPH_INPUTS: inputs, BUILDGRAPH_OUTPUT: output, BUILD_FLAVOR: 'integration' } });
-    const visibility = job.steps.find(step => step.id === 'pack').with.visibility ?? 'encrypted';
+    const visibility = job.steps.find(step => step.id === 'upload').with.visibility ?? 'encrypted';
     archives.set(id, await pack({ directory: output, visibility, key, context: id, tempRoot: root }));
   }
   const destination = join(root, 'distribution');
@@ -44,7 +44,7 @@ test('bundled planner reads the workflow itself and produces the selected job ou
     ...process.env, INPUT_OPERATION: 'plan', INPUT_WORKFLOW: '.github/workflows/build.yml', INPUT_TARGET: 'cli',
     GITHUB_STEP_SUMMARY: join(root, 'summary'), GITHUB_OUTPUT: join(root, 'outputs'),
   };
-  await exec(process.execPath, ['dist/action.cjs'], { env });
+  await exec(process.execPath, ['plan/index.cjs'], { env: { ...env, INPUT_OPERATION: '' } });
   assert.match(await readFile(join(root, 'outputs'), 'utf8'), /\["core","cli"\]/);
   assert.doesNotMatch(await readFile(join(root, 'summary'), 'utf8'), /bundle|independent/);
   await assert.rejects(exec(process.execPath, ['dist/action.cjs'], { env: { ...env, INPUT_TARGET: 'missing' } }), error => /Unknown target job/.test(error.stdout));

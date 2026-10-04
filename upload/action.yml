@@ -1,0 +1,24 @@
+name: Buildgraph upload
+description: Pack and optionally encrypt a directory, then upload it as one artifact
+inputs:
+  path:
+    description: Output directory to package, relative to the workspace or absolute
+    required: true
+  key:
+    description: 64-character hex secret; required for encrypted artifacts
+  visibility:
+    description: encrypted or public
+    default: encrypted
+  retention-days:
+    description: Retention in days; 0 uses the repository default
+    default: '7'
+outputs:
+  artifact-id:
+    description: Immutable artifact ID to pass to downstream jobs
+  artifact-name:
+    description: Unique name generated for this upload
+  artifact-digest:
+    description: SHA-256 digest returned by GitHub
+runs:
+  using: node24
+  main: index.cjs

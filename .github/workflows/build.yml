@@ -37,10 +37,9 @@ jobs:
         with:
           path: hub
           persist-credentials: false
-      - uses: ./hub
+      - uses: ./hub/plan
         id: graph
         with:
-          operation: plan
           workflow: hub/.github/workflows/build.yml
           target: ${{ inputs.target }}
 
@@ -53,35 +52,15 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - *checkout_hub
-      - &prepare
-        name: Prepare workspace
-        uses: ./hub
-        with:
-          operation: prepare
-          directory: ${{ env.BUILDGRAPH_OUTPUT }}
-          inputs-directory: ${{ env.BUILDGRAPH_INPUTS }}
-          source-directory: ${{ github.workspace }}/hub
       - name: Build shared core
         run: node examples/demo/build.mjs core
-      - &pack_encrypted
-        name: Package encrypted output
-        uses: ./hub
-        id: pack
-        with:
-          operation: pack
-          directory: ${{ env.BUILDGRAPH_OUTPUT }}
-          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-          context: ${{ github.run_id }}:${{ github.sha }}:${{ github.job }}
       - &upload
-        name: Upload packaged output
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        name: Upload encrypted output
+        uses: ./hub/upload
         id: upload
         with:
-          name: bg-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
-          path: ${{ steps.pack.outputs.archive }}
-          if-no-files-found: error
-          retention-days: 7
-          compression-level: 0
+          path: ${{ env.BUILDGRAPH_OUTPUT }}
+          key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
 
   web:
     needs: [plan, core]
@@ -91,26 +70,15 @@ jobs:
     outputs: *artifact_output
     steps:
       - *checkout_hub
-      - *prepare
       - &download_core
         name: Download core
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: ./hub/download
         with:
-          artifact-ids: ${{ needs.core.outputs.artifact_id }}
-          path: transfer/core
-          digest-mismatch: error
-      - &restore_core
-        name: Restore core
-        uses: ./hub
-        with:
-          operation: unpack
-          archive: transfer/core/output.bgenc
-          directory: ${{ env.BUILDGRAPH_INPUTS }}/core
+          artifact-id: ${{ needs.core.outputs.artifact_id }}
+          path: ${{ env.BUILDGRAPH_INPUTS }}/core
           key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-          context: ${{ github.run_id }}:${{ github.sha }}:core
       - name: Build web with core
         run: node examples/demo/build.mjs web
-      - *pack_encrypted
       - *upload
 
   cli:
@@ -121,12 +89,9 @@ jobs:
     outputs: *artifact_output
     steps:
       - *checkout_hub
-      - *prepare
       - *download_core
-      - *restore_core
       - name: Build CLI with core
         run: node examples/demo/build.mjs cli
-      - *pack_encrypted
       - *upload
 
   bundle:
@@ -137,46 +102,27 @@ jobs:
     outputs: *artifact_output
     steps:
       - *checkout_hub
-      - *prepare
       - name: Download web
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: ./hub/download
         with:
-          artifact-ids: ${{ needs.web.outputs.artifact_id }}
-          path: transfer/web
-          digest-mismatch: error
-      - name: Restore web
-        uses: ./hub
-        with:
-          operation: unpack
-          archive: transfer/web/output.bgenc
-          directory: ${{ env.BUILDGRAPH_INPUTS }}/web
+          artifact-id: ${{ needs.web.outputs.artifact_id }}
+          path: ${{ env.BUILDGRAPH_INPUTS }}/web
           key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-          context: ${{ github.run_id }}:${{ github.sha }}:web
       - name: Download CLI
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: ./hub/download
         with:
-          artifact-ids: ${{ needs.cli.outputs.artifact_id }}
-          path: transfer/cli
-          digest-mismatch: error
-      - name: Restore CLI
-        uses: ./hub
-        with:
-          operation: unpack
-          archive: transfer/cli/output.bgenc
-          directory: ${{ env.BUILDGRAPH_INPUTS }}/cli
+          artifact-id: ${{ needs.cli.outputs.artifact_id }}
+          path: ${{ env.BUILDGRAPH_INPUTS }}/cli
           key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
-          context: ${{ github.run_id }}:${{ github.sha }}:cli
       - name: Assemble distributable
         run: node examples/demo/build.mjs bundle
-      - &pack_public
-        name: Package public output
-        uses: ./hub
-        id: pack
+      - &upload_public
+        name: Upload public output
+        uses: ./hub/upload
+        id: upload
         with:
-          operation: pack
-          directory: ${{ env.BUILDGRAPH_OUTPUT }}
+          path: ${{ env.BUILDGRAPH_OUTPUT }}
           visibility: public
-      - *upload
 
   independent:
     needs: plan
@@ -186,8 +132,6 @@ jobs:
     outputs: *artifact_output
     steps:
       - *checkout_hub
-      - *prepare
       - name: Independent target
         run: node examples/demo/build.mjs independent
-      - *pack_public
-      - *upload
+      - *upload_public

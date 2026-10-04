@@ -74,3 +74,24 @@ export function order(workflow) {
   validate(workflow);
   return topologicalOrder(workflow);
 }
+
+/** Diagnoses the documented selection condition without evaluating arbitrary GitHub expressions. */
+export function diagnoseWiring(workflow, { plannerJob = 'plan' } = {}) {
+  validate(workflow);
+  if (!has(workflow.jobs, plannerJob)) return [];
+  const diagnostics = [];
+  for (const [id, job] of Object.entries(workflow.jobs)) {
+    if (id === plannerJob) continue;
+    const condition = String(job.if ?? '').trim().replace(/^\$\{\{\s*|\s*\}\}$/g, '');
+    const selection = condition.match(/^(?:!inputs\.plan_only\s*&&\s*)?contains\(\s*fromJSON\(\s*needs\.([A-Za-z_][A-Za-z0-9_-]*)\.outputs\.selected\s*\)\s*,\s*'([A-Za-z_][A-Za-z0-9_-]*)'\s*\)$/i);
+    const emit = (level, message) => diagnostics.push({ level, job: id, message: `${id}: ${message}` });
+    if (selection) {
+      if (selection[1] !== plannerJob) emit('error', `selection condition reads ${selection[1]}; use planner ${plannerJob}`);
+      if (selection[2] !== id) emit('error', `selection condition names '${selection[2]}'; replace it with '${id}'`);
+      if (!dependencies(workflow, id).includes(plannerJob)) emit('error', `add ${plannerJob} directly to needs to read its selected output`);
+    } else if (dependencies(workflow, id).includes(plannerJob)) {
+      emit('warning', `selection condition could not be checked; use contains(fromJSON(needs.${plannerJob}.outputs.selected), '${id}') or verify your custom condition`);
+    }
+  }
+  return diagnostics;
+}

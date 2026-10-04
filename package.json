@@ -4,20 +4,43 @@
   "description": "Select build targets and transfer artifacts in native GitHub Actions workflows.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=24" },
-  "bin": { "buildgraph": "bin/buildgraph.js" },
-  "exports": { ".": "./src/index.js" },
-  "files": ["bin", "src", "dist", "action.yml", "README.md", "docs", "LICENSE"],
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "buildgraph": "bin/buildgraph.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "dist",
+    "plan",
+    "upload",
+    "download",
+    "action.yml",
+    "README.md",
+    "docs",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "node scripts/build.js",
     "test": "node --test",
     "check": "npm test && node bin/buildgraph.js validate && node bin/buildgraph.js validate examples/private-projects.yml"
   },
-  "repository": { "type": "git", "url": "https://github.com/wibus-wee/buildgraph.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wibus-wee/buildgraph.git"
+  },
   "dependencies": {
+    "@actions/artifact": "6.2.1",
     "@actions/core": "3.0.1",
     "tar": "7.5.22",
     "yaml": "2.9.1"
   },
-  "devDependencies": { "esbuild": "0.28.2" }
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
 }

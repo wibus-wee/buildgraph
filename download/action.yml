@@ -1,0 +1,20 @@
+name: Buildgraph download
+description: Download one artifact from this run, verify, decrypt, and restore its directory
+inputs:
+  artifact-id:
+    description: One artifact ID from the upstream job output
+    required: true
+  path:
+    description: Destination directory, which must not already exist
+    required: true
+  key:
+    description: Same 64-character hex secret used by the producer
+  visibility:
+    description: encrypted or public; must match the producer
+    default: encrypted
+outputs:
+  path:
+    description: Absolute path of the restored directory
+runs:
+  using: node24
+  main: index.cjs

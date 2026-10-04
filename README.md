@@ -6,6 +6,7 @@
 | --- | --- |
 | [.github/workflows/build.yml](./.github/workflows/build.yml) | 直接编辑的构建图：core → web / cli → bundle |
 | [私有项目工作流](./examples/private-projects.yml) | 私有源码 checkout、共享 env、产物传递、统一 Release |
+| [plan](./plan/action.yml) / [upload](./upload/action.yml) / [download](./download/action.yml) | 选择目标、一步上传、一步恢复；在已有 workflow 中直接 uses |
 | [工作流接入](./docs/configuration.md) | 原生 YAML 写法、选择目标、认证和 Action inputs |
 | [架构与边界](./docs/architecture.md) | 目标筛选、失败传播、产物协议和公开数据边界 |
 | [复用指南](./docs/reuse.md) | 在现有工作流中 uses 本项目，或调用 JS 库 / CLI |
@@ -61,7 +62,25 @@ app:
     - run: npm run build
 ```
 
-完整的下载上游产物、准备工作区、构建和发布写法在[私有项目工作流](./examples/private-projects.yml)中。通用配置放顶层 `env` 或仓库 variables，通用步骤可以用 YAML anchors、composite actions 或 reusable workflows 复用。
+产物操作各用一个 step。下面使用已经 checkout 到 `hub/` 的本仓库；`upload` 的 `artifact-id` 经 job output 传给下游：
+
+```yaml
+- uses: ./hub/download
+  with:
+    artifact-id: ${{ needs.core.outputs.artifact_id }}
+    path: inputs/core
+    key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+- run: npm run build
+- uses: ./hub/upload
+  id: upload
+  with:
+    path: dist
+    key: ${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}
+```
+
+打包、加密、校验、恢复、临时目录清理都由 Action 完成。最终公开产物使用 `visibility: public`，省略 key。完整的 job outputs、checkout、构建和发布写法在[私有项目工作流](./examples/private-projects.yml)中。
+
+通用配置放顶层 `env` 或仓库 variables，通用步骤可以用 YAML anchors、composite actions 或 reusable workflows 复用。planner 会对标准选择条件中的错误 job ID、缺失的直接 planner 依赖报错；自定义条件仍由 GitHub 执行。
 
 源码仓库不需要安装工作流。所有构建在中央公开 repo 执行，多个项目可以用不同 tag 前缀发布到同一个仓库的 Releases。
 

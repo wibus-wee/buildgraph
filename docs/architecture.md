@@ -6,7 +6,8 @@
 | --- | --- | --- |
 | 构建定义 | [build.yml](../.github/workflows/build.yml) | `workflow_dispatch`、jobs、needs、steps、凭证及发布 |
 | Planner | [graph.js](../src/graph.js) | 读取 YAML，校验依赖、检测环、计算目标闭包 |
-| Action | [action.yml](../action.yml)、[action.js](../src/action.js) | plan、prepare、pack、unpack，可直接 uses |
+| Action | [plan](../plan/action.yml)、[upload](../upload/action.yml)、[download](../download/action.yml) | 原生 uses 入口，输入校验、输出与摘要 |
+| 传输 | [transfer.js](../src/transfer.js) | 官方 artifact SDK、自动 context、digest 校验、临时文件生命周期 |
 | 产物协议 | [artifacts.js](../src/artifacts.js) | tar 打包、加密、认证、受限解包 |
 | 本地工具 | [CLI](../bin/buildgraph.js) | 校验、查看计划、生成新密钥 |
 
@@ -14,11 +15,11 @@
 
 workflow_dispatch 首先运行 plan job。它 checkout 当前运行版本的中央仓库，读取当前 workflow 文件的 `jobs` 和 `needs`，计算选中目标及其所有上游。输出中不含 planner 自身。工作流的 job-level `if` 使用这个集合决定执行哪些 jobs。
 
-GitHub 的 `needs` 保持原样：公共依赖只有一个 job，独立分支可以并行，汇合节点等待所有直接上游。planner 不解释 steps、env、secrets、矩阵或 job 条件，也不修改正在执行的工作流。读取的是被 checkout 的 YAML；plan 中不要另行 checkout 一个不同于本次执行版本的 ref。
+GitHub 的 `needs` 保持原样：公共依赖只有一个 job，独立分支可以并行，汇合节点等待所有直接上游。planner 不执行 steps、env、secrets、矩阵或 job 条件，也不修改正在执行的工作流。独立的接线检查只识别文档约定的选择条件，诊断错误 ID 和缺失的 planner 依赖；其他表达式保留原生语义。读取的是被 checkout 的 YAML；plan 中不要另行 checkout 一个不同于本次执行版本的 ref。
 
 读取使用 YAML 1.2，保留 `on` 键，支持 anchors 和 aliases，拒绝重复键、无效 needs、缺失依赖和循环。GitHub/actionlint 负责完整的工作流语法。Planner 可分析原生矩阵与 reusable workflow job 的外层依赖，但不会展开其内部节点。
 
-构建 job 显式 checkout 私有源码、下载所需上游 artifact、恢复到 inputs，执行构建，再打包 output。目录、认证、变量和权限直接写在 YAML 中。pack 不会自动上传任何文件，上传和发布仍是可见的标准 steps。
+构建 job 显式 checkout 私有源码，用 download 恢复上游产物，执行构建，再用 upload 上传指定输出目录。目录、认证、变量和权限直接写在 YAML 中。三个 Action 共用打包后的 JS 入口，传输只调用官方 `@actions/artifact` SDK；库的 pack/unpack 保持独立，不隐式访问网络。
 
 ## 失败与重跑
 
@@ -26,15 +27,15 @@ GitHub 的 `needs` 保持原样：公共依赖只有一个 job，独立分支可
 
 没有隐式构建重试、部署回滚或发布事务。需要互斥发布时使用 job 的 `concurrency`。GitHub concurrency 不保证 FIFO，新的等待项可能替换已有等待项。
 
-示例 artifact 名包含 run_id、run_attempt 和 job ID；下游按上游导出的 artifact ID 读取。重跑单个节点可以继续使用同一 run 中未重跑的上游产物。密钥轮换或 artifact 过期后，需要重跑相关上游或全图。
+自动 artifact 名包含 run_id、run_attempt、job ID 和随机 UUID；下游按上游导出的不可变 artifact ID 读取。重跑单个节点可以继续使用同一 run 中未重跑的上游产物。密钥轮换或 artifact 过期后，需要重跑相关上游或全图。
 
 ## 产物协议
 
-文件先封装成 portable gzip tar。加密格式是 `BG01 | nonce(12) | tag(16) | ciphertext`，采用 AES-256-GCM。附加认证数据为格式标记加调用方传入的 context；工作流示例用 run、中央仓库 commit 和生产者 job ID 区分产物。
+文件先封装成 portable gzip tar。加密格式是 `BG01 | nonce(12) | tag(16) | ciphertext`，采用 AES-256-GCM。附加认证数据为格式标记加 context。传输层生成的 context 是 `["buildgraph-transfer-v1", repository, run_id, sha, artifact_name]` 的 JSON 字符串；这是内部认证编码，用户配置仍只有原生 YAML。下载端从当前 run 的平台元数据按 artifact ID 取得原名称，因此不需要用户重复填写生产者和 attempt。
 
-加密完成后才把 archive 路径交给 upload-artifact。恢复时先在临时文件中验证完整认证标签，再检查 archive 路径及类型，最后解包到临时目录并移动到目标。拒绝路径穿越、绝对路径、链接、`.git` 和特殊文件；失败不会暴露恢复了一半的 inputs 目录。
+加密完成后才把 archive 路径交给 SDK 上传。下载端必须取得并验证平台 SHA-256 digest，再在临时文件中验证完整认证标签，然后检查 archive 路径及类型，最后解包到临时目录并移动到目标。拒绝路径穿越、绝对路径、链接、`.git` 和特殊文件；失败不会暴露恢复了一半的 inputs 目录。传输层在 finally 清理 archive 临时目录；已成功上传但消费者失败的 artifact 保留到过期，便于重跑。
 
-public 模式执行同样的文件封装和路径检查，但不加密。download-artifact 同时校验平台 artifact digest。拥有相同密钥的参与者可以创建有效密文；此机制保护存储内容和传输完整性，不隔离同一密钥的持有者。
+public 模式执行同样的文件封装、平台 digest 校验和路径检查，但不加密。拥有相同密钥的参与者可以创建有效密文；此机制保护存储内容和传输完整性，不隔离同一密钥的持有者，也不构成独立的来源证明。
 
 ## 公开数据与信任边界
 

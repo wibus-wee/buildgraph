@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dependencies, order, parseWorkflow, plan, readWorkflow, validate } from '../src/index.js';
+import { dependencies, diagnoseWiring, order, parseWorkflow, plan, readWorkflow, validate } from '../src/index.js';
 
 const demo = await readWorkflow('.github/workflows/build.yml');
 const copy = () => structuredClone(demo);
@@ -104,9 +104,32 @@ test('native demo keeps fail propagation and artifact IDs in visible workflow YA
   assert.deepEqual(Object.keys(demo.on), ['workflow_dispatch']);
   assert.doesNotMatch(demo.jobs.core.if, /always\(/);
   const download = demo.jobs.bundle.steps.find(s => s.name === 'Download web');
-  assert.equal(download.with['artifact-ids'], '${{ needs.web.outputs.artifact_id }}');
-  assert.equal(download.with['digest-mismatch'], 'error');
-  assert.equal(demo.jobs.core.steps.find(s => s.id === 'pack').with.key, '${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}');
-  assert.equal(demo.jobs.bundle.steps.find(s => s.id === 'pack').with.visibility, 'public');
-  assert.equal(demo.jobs.bundle.steps.find(s => s.id === 'pack').with.key, undefined);
+  assert.equal(download.with['artifact-id'], '${{ needs.web.outputs.artifact_id }}');
+  assert.equal(download.uses, './hub/download');
+  assert.equal(demo.jobs.core.steps.find(s => s.id === 'upload').with.key, '${{ secrets.BUILDGRAPH_ARTIFACT_KEY }}');
+  assert.equal(demo.jobs.bundle.steps.find(s => s.id === 'upload').with.visibility, 'public');
+  assert.equal(demo.jobs.bundle.steps.find(s => s.id === 'upload').with.key, undefined);
+});
+
+test('wiring diagnostics catch copied IDs and missing direct planner edges', () => {
+  assert.deepEqual(diagnoseWiring(demo), []);
+  const workflow = copy();
+  workflow.jobs.web.needs = 'core';
+  workflow.jobs.web.if = workflow.jobs.cli.if;
+  const errors = diagnoseWiring(workflow);
+  assert.equal(errors.length, 2);
+  assert.ok(errors.every(item => item.level === 'error' && item.job === 'web'));
+  assert.match(errors[0].message, /replace it with 'web'/);
+  assert.match(errors[1].message, /add plan directly to needs/);
+});
+
+test('custom expressions remain native and receive warnings, not guessed evaluations', () => {
+  const workflow = copy();
+  workflow.jobs.cli.if = "always() && needs.core.result == 'success'";
+  const diagnostics = diagnoseWiring(workflow);
+  assert.equal(diagnostics.length, 1);
+  assert.equal(diagnostics[0].level, 'warning');
+  assert.deepEqual(plan(workflow, { target: 'cli' }).selected, ['core', 'cli']);
+  const renamed = parseWorkflow("jobs:\n  choose: {}\n  app:\n    needs: choose\n    if: contains(fromJSON(needs.choose.outputs.selected), 'app')\n");
+  assert.deepEqual(diagnoseWiring(renamed, { plannerJob: 'choose' }), []);
 });
